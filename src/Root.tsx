@@ -1,55 +1,41 @@
 import React from "react";
 import { Composition } from "remotion";
-import { PrimeEpopReveal, DRAW_SECONDS, HOLD_SECONDS } from "./PrimeEpopReveal";
-import {
-  PrimeEpopZoomOut,
-  DRAW_SECONDS as ZO_DRAW,
-  HOLD1_SECONDS,
-  ZOOM_SECONDS,
-  HOLD2_SECONDS,
-} from "./PrimeEpopZoomOut";
-import { UnrateReveal, DRAW_SECONDS as UR_DRAW, HOLD_SECONDS as UR_HOLD } from "./UnrateReveal";
-import {
-  UnemployedOpeningsReveal,
-  DRAW_SECONDS as UO_DRAW,
-  HOLD_SECONDS as UO_HOLD,
-} from "./UnemployedOpeningsReveal";
+import { LineVideo, LineSpec, calculateLineMetadata } from "./compositions/LineVideo";
 import { RipCardReveal, calculateRipCardMetadata } from "./RipCardReveal";
 import { ListReveal, TOTAL_FRAMES as LIST_TOTAL_FRAMES } from "./ListReveal";
 
 const FPS = 30;
 
+// Remotion's --props shallow-merges the render-time spec ONTO defaultProps
+// rather than replacing it, so any optional field this default sets (avg,
+// initialWindowStart, waypointFade, ...) would silently survive into every
+// spec rendered here that doesn't itself set that field -- a real bug this
+// project hit once already (see PLAN.md Phase 2 verification notes). Keeping
+// this to only the fields every LineSpec must set means there is nothing
+// optional left to leak, for this spec or any future one.
+const STUDIO_DEFAULT_SPEC: LineSpec = {
+  id: "studio-default",
+  series: [{ ref: "prime_epop" }],
+  window: ["2019-01-01", "latest"],
+  shots: [
+    { kind: "draw", seconds: 4.5 },
+    { kind: "hold", seconds: 6 },
+  ],
+};
+
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/* One generic line-chart shape, reused for every line video -- which
+          spec loads comes from --props at render time (see specs/*.json),
+          not from a new composition per video. defaultProps below is only
+          what Studio shows when you open this composition directly. */}
       <Composition
-        id="PrimeEpopReveal"
-        component={PrimeEpopReveal}
-        durationInFrames={Math.round(FPS * (DRAW_SECONDS + HOLD_SECONDS))}
-        fps={FPS}
-        width={1080}
-        height={1920}
-      />
-      <Composition
-        id="PrimeEpopZoomOut"
-        component={PrimeEpopZoomOut}
-        durationInFrames={Math.round(FPS * (ZO_DRAW + HOLD1_SECONDS + ZOOM_SECONDS + HOLD2_SECONDS))}
-        fps={FPS}
-        width={1080}
-        height={1920}
-      />
-      <Composition
-        id="UnrateReveal"
-        component={UnrateReveal}
-        durationInFrames={Math.round(FPS * (UR_DRAW + UR_HOLD))}
-        fps={FPS}
-        width={1080}
-        height={1920}
-      />
-      <Composition
-        id="UnemployedOpeningsReveal"
-        component={UnemployedOpeningsReveal}
-        durationInFrames={Math.round(FPS * (UO_DRAW + UO_HOLD))}
+        id="LineVideo"
+        component={LineVideo}
+        calculateMetadata={calculateLineMetadata}
+        defaultProps={STUDIO_DEFAULT_SPEC}
+        durationInFrames={30}
         fps={FPS}
         width={1080}
         height={1920}

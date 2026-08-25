@@ -10,16 +10,44 @@ breaking old specs.
 every future session start from the same place. It gets written incrementally,
 one section per phase, not all at the end.
 
-**Status.** Phase 0 and Phase 1 are done. Repo lives at
+**Status.** Phases 0-2 are done. Repo lives at
 `~/Documents/GitHub/cool_tiktok_graphics`, pushed to
 `github.com/mtkonczal/cool_tiktok_graphics` (public, per an explicit choice —
 see Section 6). `data/series.json` and `data/fetch.R` exist; all five
 series behind the existing videos were regenerated from FRED and matched the
 committed legacy JSON exactly, decimal for decimal, so none of the provenance
-guesses in Section 7's table turned out to be wrong. The legacy
-`src/data/data_*.json` files are untouched and still what the six current
-compositions import — rewiring them onto the registry is Phase 2's job, not
-done yet. Section 7 has every environment fact verified before the move, so a
+guesses in Section 7's table turned out to be wrong.
+
+Phase 2 replaced the four bespoke chart components with one generic
+`LineVideo` composition (`src/compositions/LineVideo.tsx`) driven by a JSON
+spec (`specs/*.json`), backed by `src/engine/{scales,format,waypoints}.ts`
+and `src/bodies/LineBody.tsx`. `Root.tsx` is down to its planned 3
+compositions. All four ported videos were checkpoint-verified against a
+from-scratch render of the actual pre-Phase-2 source (not just whatever was
+sitting in `out/`, which turned out to have gone stale relative to `src/` at
+least once already — worth remembering for future verification passes):
+`prime-epop-reveal`, `unrate-reveal`, and `prime-epop-zoomout` are
+byte-identical or pixel-identical; `unemployed-openings-reveal` differs only
+by one extra month of genuinely fresher UNEMPLOY data, which is Phase 1
+working as intended. Two real porting bugs surfaced and got fixed along the
+way, both worth knowing about if this pattern gets reused: Remotion's
+`--props` shallow-merges onto a composition's `defaultProps` rather than
+replacing it, so `Root.tsx`'s default spec must carry zero optional fields
+or they silently leak into every other spec rendered against that
+composition; and once chart series live in shared full-history arrays rather
+than one file pre-sliced per video, any array-index math that used to mean
+"the start/end of my array" (a stand-in for "the start/end of my window"
+back when those were the same thing) has to be rewritten in terms of the
+resolved window bounds instead. The waypoint resolvers (`min`/`max`/`latest`)
+also fixed the exact stale-hardcode bug Section 1 and Section 7 flagged —
+verified that "min"/"max" over unrate's 2022-present window still land on
+the same April 2023 / November 2025 dates the old literal hardcodes did, so
+nothing about today's video changed, but next month's high or low will now
+resolve correctly instead of silently going stale.
+
+The legacy `src/data/data_*.json` files (the five originally pasted-in
+files) are still tracked but are now dead weight — nothing imports them
+anymore. Section 7 has every environment fact verified before the move, so a
 fresh session can start without re-checking any of it.
 
 ---

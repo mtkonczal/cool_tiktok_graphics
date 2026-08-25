@@ -1,0 +1,13 @@
+{
+  "id": "unrate-reveal",
+  "series": [{ "ref": "unrate" }],
+  "window": ["2022-01-01", "latest"],
+  "waypoints": ["min", "2024-07-01", "max", "latest"],
+  "waypointAnchor": "point",
+  "waypointBelowDot": "latest",
+  "displayDecimals": 1,
+  "shots": [
+    { "kind": "draw", "seconds": 3.0 },
+    { "kind": "hold", "seconds": 6 }
+  ]
+}

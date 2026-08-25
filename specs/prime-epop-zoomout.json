@@ -1,0 +1,43 @@
+{
+  "id": "prime-epop-zoomout",
+  "series": [
+    {
+      "ref": "prime_epop"
+    }
+  ],
+  "window": [
+    "1995-01-01",
+    "latest"
+  ],
+  "initialWindowStart": "2019-01-01",
+  "waypoints": [
+    "1999-01-01",
+    "2019-12-01",
+    "2023-05-01",
+    "latest"
+  ],
+  "waypointFade": "2023-05-01",
+  "avg": {
+    "from": "2024-01-01",
+    "label": "2024–2026 average",
+    "labelAt": "2008-09-01"
+  },
+  "shots": [
+    {
+      "kind": "draw",
+      "seconds": 3.5
+    },
+    {
+      "kind": "hold",
+      "seconds": 6.0
+    },
+    {
+      "kind": "zoom",
+      "seconds": 3.0
+    },
+    {
+      "kind": "hold",
+      "seconds": 10.0
+    }
+  ]
+}

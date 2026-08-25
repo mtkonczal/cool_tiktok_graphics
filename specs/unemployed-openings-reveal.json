@@ -1,0 +1,11 @@
+{
+  "id": "unemployed-openings-reveal",
+  "series": [{ "ref": "unemployed" }, { "ref": "openings" }],
+  "chrome": { "title": "Job openings vs. unemployed" },
+  "palette": "petrol",
+  "window": ["2023-01-01", "latest"],
+  "shots": [
+    { "kind": "draw", "seconds": 3.5 },
+    { "kind": "hold", "seconds": 6 }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "prime-epop-reveal",
+  "series": [{ "ref": "prime_epop" }],
+  "window": ["2019-01-01", "latest"],
+  "waypoints": ["2019-12-01", "2023-05-01", "latest"],
+  "shots": [
+    { "kind": "draw", "seconds": 4.5 },
+    { "kind": "hold", "seconds": 6 }
+  ]
+}

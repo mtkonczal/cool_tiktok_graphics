@@ -1,17 +1,18 @@
-// Shared engine for the "line reveal" chart family: scales, easing, gap
-// handling, and waypoint-callout logic. Ported directly from the
-// HTML/Playwright prototype (chart_template.html) -- same math, typed and
-// split so future chart types (bar/scatter/table/histogram) can share the
-// palette, layout, and easing helpers below without sharing this file's
-// line-specific reveal logic.
+// Shared geometry engine for the line-chart family: scales, easing, gap
+// handling, and axis tick selection. Ported directly from the HTML/Playwright
+// prototype (chart_template.html) -- same math, typed and split so future
+// chart types (bar/scatter/table/histogram) can share the palette, layout,
+// and easing helpers below without sharing this file's line-specific logic.
+//
+// Split out of chartEngine.ts in Phase 2: waypoint callouts (Waypoint,
+// makeWaypoints, resolveIndex) moved to engine/waypoints.ts, since those are
+// specifically about picking and labeling points, not about scales.
+
+export { PLOT } from "../theme";
+import { PLOT } from "../theme";
 
 export type DataRow = { date: string; value: number | null };
-
-// Palette and frame geometry now live in theme.ts, which traces every value
-// back to a mikekonczal.com token. PLOT is re-exported so px()/py() and the
-// chart bodies keep reading it from here.
-export { PETROL, PAPER, PLOT, SAFE, TEXTSAFE, ROW, TYPE, TABULAR, STROKE, MARK, MAX_LABEL_SHRINK } from "./theme";
-import { PLOT } from "./theme";
+export type Point = [number, number]; // [index, value]
 
 export function px(idx: number, xDomain: [number, number]): number {
   return PLOT.left + ((idx - xDomain[0]) / (xDomain[1] - xDomain[0])) * (PLOT.right - PLOT.left);
@@ -48,7 +49,33 @@ export function ylimFor(data: DataRow[], i0: number, i1: number, padFrac = 0.15)
   return [lo - pad, max + pad];
 }
 
-export type Point = [number, number]; // [index, value]
+// Multi-series variants: the y-domain for a 2+ line chart has to span every
+// line, not just the first (a domain sized to only the primary series would
+// clip a second series that runs higher or lower).
+export function dataMaxAndPadMulti(dataArrays: DataRow[][], i0: number, i1: number, padFrac = 0.15) {
+  let lo = Infinity, hi = -Infinity;
+  for (const data of dataArrays) {
+    for (let i = i0; i <= i1; i++) {
+      const v = data[i].value;
+      if (isMissing(v)) continue;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  }
+  return { max: hi, pad: (hi - lo) * padFrac };
+}
+
+export function ylimForMulti(dataArrays: DataRow[][], i0: number, i1: number, padFrac = 0.15): [number, number] {
+  const { max, pad } = dataMaxAndPadMulti(dataArrays, i0, i1, padFrac);
+  let lo = Infinity;
+  for (const data of dataArrays) {
+    for (let i = i0; i <= i1; i++) {
+      const v = data[i].value;
+      if (!isMissing(v) && v < lo) lo = v;
+    }
+  }
+  return [lo - pad, max + pad];
+}
 
 // Cumulative point runs (split at gaps) from row i0 through fractional row
 // `tipExact`, with a linearly-interpolated point at the tip for a smooth
@@ -104,66 +131,17 @@ export function findIdx(data: DataRow[], dateStr: string): number {
   return data.findIndex((r) => r.date === dateStr);
 }
 
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-export type Waypoint = {
-  idx: number;
-  val: number;
-  dateLabel: string;
-  valueLabel: string;
-  calloutYDate: number;
-  calloutYValue: number;
-  /** 0-1, defaults to 1 when omitted -- lets a waypoint fade out (e.g. a
-   * recent-history callout ceding the frame to a longer-range one) without
-   * being removed from the array mid-animation. */
-  opacity?: number;
-};
-
-export function makeWaypoints(
-  data: DataRow[],
-  idxs: number[],
-  calloutBase: { max: number; pad: number },
-  decimals = 1,
-  anchor: "max" | "point" = "max"
-): Waypoint[] {
-  return idxs.map((idx) => {
-    const md = monthDate(data[idx].date);
-    const val = data[idx].value as number;
-    // "max" clusters every callout at the same height near the series max --
-    // reads fine when the waypoints themselves all sit close to that max (the
-    // EPOP charts' recent-history trio). "point" anchors each callout above
-    // its own waypoint instead, for series where waypoints span a wide range
-    // (e.g. a cycle low next to a cycle high) and clustering at the max would
-    // strand a low waypoint's label far above its own dot.
-    //
-    // For "point", the value-label gap is a fraction of the *headroom* above
-    // the waypoint (domain top minus its value), not a fixed multiple of pad:
-    // a waypoint near the domain top (little headroom) gets a small gap, so
-    // its label doesn't overshoot past the plot into the x-axis row; a
-    // waypoint near the bottom (lots of headroom, and usually more line
-    // wiggle around it) gets a bigger gap, clearing the line instead of
-    // sitting right on top of it. The date label keeps the same fixed offset
-    // above the value label used everywhere else, so the two rows never
-    // collide regardless of how much headroom the point has.
-    const domainTop = calloutBase.max + calloutBase.pad;
-    const calloutYValue =
-      anchor === "point" ? val + (domainTop - val) * 0.4 : calloutBase.max + calloutBase.pad * 0.28;
-    const calloutYDate = anchor === "point" ? calloutYValue + calloutBase.pad * 0.6 : calloutBase.max + calloutBase.pad * 0.88;
-    return {
-      idx,
-      val,
-      dateLabel: `${MONTH_NAMES[md.month - 1]} ${md.year}`,
-      valueLabel: `${val.toFixed(decimals)}%`,
-      // Callout offsets stay in DATA space (not pixels) so the zoom-out
-      // composition can interpolate calloutBase and have the labels travel
-      // with the zoom. Widened from 0.62/0.28 to 0.85/0.22 to fit the larger
-      // type: because pad is proportional to range, the gap works out to a
-      // constant 0.60 * padFrac / (1 + 2 * padFrac) of plot height -- about
-      // 60px -- whatever the data, so this holds for both compositions.
-      calloutYDate,
-      calloutYValue,
-    };
-  });
+// Re-grids `other` onto `reference`'s dates, so two series with different
+// native start dates (e.g. openings starts 2000-12, unemployed starts 1948)
+// share one array index -> date mapping, the same relationship a single
+// multi-series getFRED() pull would have given for free by padding the
+// shorter series with NA. Multi-series mode indexes every series by the
+// primary series' array position, so this alignment has to happen before
+// anything reaches px()/buildRuns() -- a raw array index only means the same
+// date across series if the grids already line up.
+export function alignToGrid(reference: DataRow[], other: DataRow[]): DataRow[] {
+  const byDate = new Map(other.map((r) => [r.date, r.value]));
+  return reference.map((r) => ({ date: r.date, value: byDate.get(r.date) ?? null }));
 }
 
 // Pick a y-tick step giving at most `maxTicks` gridlines. The old fixed step of
