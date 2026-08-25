@@ -10,7 +10,7 @@ breaking old specs.
 every future session start from the same place. It gets written incrementally,
 one section per phase, not all at the end.
 
-**Status.** Phases 0-2 are done. Repo lives at
+**Status.** Phases 0-3 are done. Repo lives at
 `~/Documents/GitHub/cool_tiktok_graphics`, pushed to
 `github.com/mtkonczal/cool_tiktok_graphics` (public, per an explicit choice —
 see Section 6). `data/series.json` and `data/fetch.R` exist; all five
@@ -45,10 +45,34 @@ the same April 2023 / November 2025 dates the old literal hardcodes did, so
 nothing about today's video changed, but next month's high or low will now
 resolve correctly instead of silently going stale.
 
-The legacy `src/data/data_*.json` files (the five originally pasted-in
-files) are still tracked but are now dead weight — nothing imports them
-anymore. Section 7 has every environment fact verified before the move, so a
-fresh session can start without re-checking any of it.
+The five legacy `src/data/data_*.json` files were removed at the end of
+Phase 2 once nothing imported them anymore.
+
+Phase 3 extracted the shot-resolution ladder that used to live directly in
+`LineVideo.tsx` into `src/engine/shots.ts`: one `resolveShot(shots, frame,
+fps, dataArrays)` function, shot kinds `draw`/`hold`/`zoom`/`pan`/`fade`,
+relative window bounds (`"-48m"` meaning 48 months before the paired
+absolute bound — for monthly series that's just an index offset, no
+calendar math needed), and a shot can now declare its own target `window`
+instead of the spec having one global `initialWindowStart` good for at most
+one zoom. `zoom` and `pan` turned out to be the same mechanism (interpolate
+from the previous shot's settled window to this shot's declared one) --
+only their kind label differs, so there was no reason to write separate
+code paths. `prime-epop-zoomout.json` is now a plain shots array with each
+shot's own window, no bespoke fields. Verified byte-identical against
+Phase 2's own renders for all four ported videos (confirming the extraction
+changed no output), then separately exercise-tested a scratch spec with a
+relative `"-48m"` window and two zoom shots (out to full history, then back
+in) to confirm the new capabilities actually work end to end, not just that
+the refactor preserved old behavior.
+
+`fade` and `pan` are implemented in the engine but not yet used by any real
+spec — `pan`'s math is identical to `zoom`'s (proven above), and `fade`
+returns an `opacity` value `LineBody` doesn't consume yet, waiting for
+Phase 4's annotation layer to have something to fade in.
+
+Section 7 has every environment fact verified before the move, so a fresh
+session can start without re-checking any of it.
 
 ---
 

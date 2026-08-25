@@ -9,14 +9,15 @@
     "1995-01-01",
     "latest"
   ],
-  "initialWindowStart": "2019-01-01",
   "waypoints": [
     "1999-01-01",
     "2019-12-01",
     "2023-05-01",
     "latest"
   ],
-  "waypointFade": "2023-05-01",
+  "waypointFade": {
+    "token": "2023-05-01"
+  },
   "avg": {
     "from": "2024-01-01",
     "label": "2024–2026 average",
@@ -25,7 +26,8 @@
   "shots": [
     {
       "kind": "draw",
-      "seconds": 3.5
+      "seconds": 3.5,
+      "window": ["2019-01-01", "latest"]
     },
     {
       "kind": "hold",
@@ -33,7 +35,8 @@
     },
     {
       "kind": "zoom",
-      "seconds": 3.0
+      "seconds": 3.0,
+      "window": ["1995-01-01", "latest"]
     },
     {
       "kind": "hold",
