@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Explicit binary marks so LF normalization can never touch a font or a video
+*.woff2 binary
+*.mp4 binary
+*.tgz binary

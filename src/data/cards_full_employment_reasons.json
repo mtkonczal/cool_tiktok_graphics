@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Full Employment Signs",
+    "items": ["25-54 employment rate", "Unemployment rate", "Vacancy-to-unemployment ratio"],
+    "activeIndex": 0
+  },
+  {
+    "title": "Full Employment Signs",
+    "items": ["25-54 employment rate", "Unemployment rate", "Vacancy-to-unemployment ratio"],
+    "activeIndex": 1
+  },
+  {
+    "title": "Full Employment Signs",
+    "items": ["25-54 employment rate", "Unemployment rate", "Vacancy-to-unemployment ratio"],
+    "activeIndex": 2
+  }
+]

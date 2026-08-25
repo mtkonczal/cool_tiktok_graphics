@@ -1,0 +1,27 @@
+# ── never ────────────────────────────────────────────────────────────────
+node_modules/
+.DS_Store
+.Rhistory
+.Rapp.history
+.Renviron
+*.log
+
+# Claude Code local state (settings, caches). The committed CLAUDE.md at the
+# repo root is the shared contract; .claude/ is per-machine.
+.claude/
+
+# ── out/: renders, not committed ─────────────────────────────────────────
+# Same rule as the other repos: if a script can rebuild it, it is not
+# committed. A spec + its committed data JSON + this code reproduce any mp4
+# exactly, so the mp4 is derived output. mp4 is also already-compressed
+# binary that git cannot delta: every re-render of the same video stores a
+# full new blob. At 2-3 videos/week for a year that is several hundred MB of
+# undeltifiable history for files we can regenerate in seconds.
+out/
+
+# ── src/data/*.json: deliberately NOT ignored ────────────────────────────
+# These look derived but are not reproducible. FRED revises: re-running
+# fetch.R six months from now returns different numbers than the vintage a
+# published video actually showed. The JSON plus its .meta.json sidecar is
+# the vintage record of what went on screen. A few KB each. Nothing above
+# matches src/data/, so they are tracked; keep it that way.
