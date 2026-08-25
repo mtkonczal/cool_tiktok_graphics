@@ -10,7 +10,7 @@ breaking old specs.
 every future session start from the same place. It gets written incrementally,
 one section per phase, not all at the end.
 
-**Status.** Phases 0-4 are done. Repo lives at
+**Status.** All of Phases 0-5 are done. Repo lives at
 `~/Documents/GitHub/cool_tiktok_graphics`, pushed to
 `github.com/mtkonczal/cool_tiktok_graphics` (public, per an explicit choice —
 see Section 6). `data/series.json` and `data/fetch.R` exist; all five
@@ -110,6 +110,39 @@ reveal, otherwise rip-card) and dispatches accordingly -- verified
 byte-identical output against both old scripts. This is only the card-render
 piece of Phase 5's fuller `make.sh` (spec-driven renders, freshness checks,
 schema validation, dated output names).
+
+Phase 5 finished `make.sh`: `./make.sh <spec.json>` now validates the spec
+(`scripts/validate-spec.mjs`, a hand-written checker, not a JSON-Schema
+library -- one spec shape, better error messages this way), prints each
+referenced series' fetch vintage and warns past 7 days old (matching
+`fetch.R`'s own staleness window), and renders to
+`out/YYYY-MM-DD-<id>.mp4`. A `"type": "sequence"` spec renders several
+clips (mixing compositions -- a list-card build-up plus its charts) and
+stitches them with `ffmpeg`'s concat demuxer into one file.
+
+The validator catches real mistakes with specific messages (tested against
+a deliberately broken spec: bad series ref, misspelled "latest", a shot
+missing its required window, an out-of-range `fade.to`, a `waypointFade`
+naming a shot that doesn't exist -- all 8 planted errors caught, none
+missed). Building the sequence feature surfaced a real bug worth
+remembering: the render command passed a sequence step's *whole* wrapper
+object (`{composition, props}`) as `--props` instead of unwrapping
+`.props` first, so none of the intended fields (`activeIndex`, `items`,
+...) ever overrode Root.tsx's defaults for that composition -- confirmed
+only by decoding actual frames from the stitched output (twice: the first
+diagnosis was itself thrown off by a known ffmpeg quirk where
+`select=eq(n,N)` can misattribute frames right at a stream-copied concat
+boundary, resolved by re-encoding before re-checking). Fixed and
+re-verified: a 2-item list-reveal sequence now shows the correct item
+revealed/wiping at each step.
+
+`CLAUDE.md` is written in full at the repo root -- the reference for using
+what's built (adding a series, writing a spec, the shot and annotation
+grammars, waypoint resolvers, the visual system's rationale, every command,
+a QA checklist, and rules for what a future session working in this repo
+should and shouldn't do). This PLAN.md file stays as the phase-by-phase
+design history and the record of what's still open (Section 6's palette
+default and sequence-stitching decisions are the only ones left).
 
 Section 7 has every environment fact verified before the move, so a fresh
 session can start without re-checking any of it.
@@ -635,8 +668,8 @@ build-up plus its three charts becomes one video. Then write `CLAUDE.md` in full
 2. ~~**Private or public.**~~ Decided: public, kept as it already was.
 3. **Palette default.** Petrol (dark) for everything, or dark for charts and
    paper (light) for cards? Right now everything is petrol and `PAPER` is unused.
-4. **Sequence stitching.** Worth building in Phase 5, or do you assemble clips
-   in a video editor anyway?
+4. ~~**Sequence stitching.**~~ Decided: built in Phase 5 (`"type": "sequence"`
+   specs, `ffmpeg` concat). Still true that most one-off videos won't need it.
 
 `out/` retention is no longer open: ignored, per the reasoning in Section 0.
 
