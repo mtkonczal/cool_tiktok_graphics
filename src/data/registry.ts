@@ -7,6 +7,7 @@ import unrate from "./unrate.json";
 import unemployed from "./unemployed.json";
 import openings from "./openings.json";
 import vuRatio from "./vu_ratio.json";
+import recessions from "./recessions.json";
 import { DataRow } from "../engine/scales";
 
 export const SERIES_DATA: Record<string, DataRow[]> = {
@@ -15,6 +16,7 @@ export const SERIES_DATA: Record<string, DataRow[]> = {
   unemployed: unemployed as DataRow[],
   openings: openings as DataRow[],
   vu_ratio: vuRatio as DataRow[],
+  recessions: recessions as DataRow[],
 };
 
 export function seriesData(ref: string): DataRow[] {

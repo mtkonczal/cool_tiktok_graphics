@@ -45,5 +45,14 @@
     "title": "Vacancy-to-unemployment ratio",
     "subtitle": "Job openings per unemployed worker",
     "note": "Not used by any current video. Registered now because its title already appears as list-card copy in src/data/cards_full_employment_reasons.json; a chart for it is a plausible near-term ask."
+  },
+  "recessions": {
+    "source": "fred",
+    "id": "USREC",
+    "units": "count",
+    "decimals": 0,
+    "title": "NBER recession indicator",
+    "subtitle": "1 during an NBER-dated recession month, 0 otherwise",
+    "note": "Not a chart series -- never plotted or formatted as a value. Phase 4's engine/annotations.ts scans this for contiguous 1-runs to build the built-in \"recessions\" band shorthand. Fetched through the same registry/fetch.R mechanism as everything else so it gets the same vintage tracking, not because it's a line anyone would draw."
   }
 }

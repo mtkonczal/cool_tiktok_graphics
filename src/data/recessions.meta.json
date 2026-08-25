@@ -1,0 +1,12 @@
+{
+  "name": "recessions",
+  "source": "fred",
+  "fetched_at": "2026-08-25T03:55:18Z",
+  "units": "count",
+  "decimals": 0,
+  "row_count": 2060,
+  "first_date": "1854-12-01",
+  "last_date": "2026-07-01",
+  "last_value": 0,
+  "fred_id": "USREC"
+}

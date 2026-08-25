@@ -3,10 +3,18 @@ import { Palette, PETROL, TEXTSAFE, TYPE } from "./theme";
 import { clamp01 } from "./ripCardEngine";
 
 // Row geometry. Sits below ChartChrome's title block (which ends well before
-// y 420), three rows fit inside TEXTSAFE with room for a 2-line label.
+// y 420). 300px was the fixed row height this always used, sized for a
+// 2-line label at 3 rows; now it's a ceiling instead of a constant, so a
+// 4-6 item list shrinks to fit TEXTSAFE instead of running off the bottom
+// (2-3 items still get exactly the original 300px rows, unchanged).
 const LIST_TOP = 420;
-const ROW_H = 300;
+const MAX_ROW_H = 300;
 const NUM_COL_W = 110;
+
+function rowHeight(itemCount: number): number {
+  const available = TEXTSAFE.y + TEXTSAFE.h - LIST_TOP;
+  return Math.min(MAX_ROW_H, available / itemCount);
+}
 
 export const REVEAL_FRAMES = 24; // 0.8s of the 1.5s clip is the wipe itself
 export const TOTAL_FRAMES = 45; // 1.5s at 30fps, fixed -- no per-card hold anymore
@@ -26,11 +34,12 @@ export const ListRevealBody: React.FC<{
   // near-instant snap rather than a visible left-to-right sweep at this
   // short a duration.
   const revealT = clamp01(frame / REVEAL_FRAMES);
+  const rowH = rowHeight(items.length);
 
   return (
     <>
       {items.map((label, i) => {
-        const rowY = LIST_TOP + i * ROW_H;
+        const rowY = LIST_TOP + i * rowH;
         const revealed = i < activeIndex;
         const active = i === activeIndex;
         const labelX = TEXTSAFE.x + NUM_COL_W;
@@ -38,7 +47,7 @@ export const ListRevealBody: React.FC<{
 
         return (
           <g key={i}>
-            <foreignObject x={TEXTSAFE.x} y={rowY} width={NUM_COL_W} height={ROW_H}>
+            <foreignObject x={TEXTSAFE.x} y={rowY} width={NUM_COL_W} height={rowH}>
               <div
                 // @ts-expect-error -- xmlns is valid on the foreignObject's HTML root
                 xmlns="http://www.w3.org/1999/xhtml"
@@ -58,7 +67,7 @@ export const ListRevealBody: React.FC<{
             </foreignObject>
 
             {(revealed || active) && (
-              <foreignObject x={labelX} y={rowY} width={labelW} height={ROW_H}>
+              <foreignObject x={labelX} y={rowY} width={labelW} height={rowH}>
                 <div
                   // @ts-expect-error -- xmlns is valid on the foreignObject's HTML root
                   xmlns="http://www.w3.org/1999/xhtml"

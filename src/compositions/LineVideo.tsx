@@ -3,10 +3,11 @@ import { useCurrentFrame } from "remotion";
 import type { CalculateMetadataFunction } from "remotion";
 import "../fonts";
 import { ChartChrome } from "../ChartChrome";
-import { AvgLine, LineBody, LineSeries } from "../bodies/LineBody";
+import { LineBody, LineSeries } from "../bodies/LineBody";
 import { alignToGrid, ease } from "../engine/scales";
 import { Shot, resolveShot, shotsDurationSeconds } from "../engine/shots";
 import { Waypoint, WaypointToken, belowDotOverride, makeWaypoints, resolveIndex } from "../engine/waypoints";
+import { AnnotationSpec, resolveAnnotations } from "../engine/annotations";
 import { seriesData } from "../data/registry";
 import { seriesMeta } from "../data/seriesMeta";
 import { FRAME, PAPER, PETROL, Palette } from "../theme";
@@ -17,14 +18,15 @@ export const FPS = 30;
 // graph of the quits rate, 2019 to now" and "prime-age employment rate,
 // zoom out at the end" lives here, not in a new .tsx file. See PLAN.md
 // Section 2c. The shot sequence itself (draw/hold/zoom/pan/fade, relative
-// windows, multi-stage sequences) is engine/shots.ts as of Phase 3; this
-// file is the line-chart-specific glue on top -- waypoints, the avg
-// reference line, and how a spec's fields turn into props for LineBody.
+// windows, multi-stage sequences) is engine/shots.ts as of Phase 3; the
+// annotation grammar (hline/vline/band/point/free, recession bands) is
+// engine/annotations.ts as of Phase 4. This file is the line-chart-specific
+// glue on top -- waypoints, and how a spec's fields turn into LineBody props.
 export type LineSpec = {
   id: string;
-  /** 1 entry = single-line mode (waypoints, avg line). 2+ entries =
-   * static-label mode (each line gets a label near its midpoint, no
-   * waypoints). */
+  /** 1 entry = single-line mode (waypoints). 2+ entries = static-label mode
+   * (each line gets a label near its midpoint, no waypoints). Annotations
+   * work in either mode. */
   series: { ref: string }[];
   chrome?: { title?: string; subtitle?: string };
   palette?: "petrol" | "paper";
@@ -48,11 +50,11 @@ export type LineSpec = {
    * (default "zoom"), ceding the frame to the wider view -- e.g. a "cycle
    * low" waypoint that's redundant once decades of history are visible. */
   waypointFade?: { token: WaypointToken; duringShot?: string };
-  /** Single-line mode only: a dashed reference line that appears once the
-   * named shot (default "zoom") starts, same bespoke prop LineChartBody
-   * always had -- generalizing this into a real annotation grammar is
-   * Phase 4. */
-  avg?: { from: WaypointToken; label: string; labelAt: string; fromShot?: string };
+  /** "Text on the thing" -- hline/vline/band/point/free, plus the built-in
+   * "recessions" shorthand. See engine/annotations.ts. Resolved against
+   * `window` (the same full extent waypoints resolve against), not
+   * whatever's currently on screen. */
+  annotations?: AnnotationSpec[];
   shots: Shot[];
 };
 
@@ -92,7 +94,6 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
   const outerWinEnd = resolveIndex(primaryData, spec.window[1]);
 
   let waypoints: Waypoint[] = [];
-  let avgLine: AvgLine | undefined;
 
   if (spec.series.length === 1) {
     const decimals = spec.displayDecimals ?? primaryMeta.decimals;
@@ -115,27 +116,20 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
         );
       }
     }
-
-    if (spec.avg && state.shotStarted[spec.avg.fromShot ?? "zoom"]) {
-      const fromIdx = resolveIndex(primaryData, spec.avg.from, { i0: outerWinStart, i1: outerWinEnd });
-      let sum = 0, n = 0;
-      for (let i = fromIdx; i <= outerWinEnd; i++) {
-        const v = primaryData[i].value;
-        if (v !== null) { sum += v; n++; }
-      }
-      avgLine = {
-        value: sum / n,
-        label: spec.avg.label,
-        // Clamp to the window's start, not array index 0 -- with every
-        // series living in one shared full-history array, index 0 is the
-        // start of that series (e.g. 1948), not necessarily this spec's
-        // window start.
-        leftIdx: Math.max(outerWinStart, state.xDomain[0]),
-        rightIdx: outerWinEnd,
-        labelIdx: resolveIndex(primaryData, spec.avg.labelAt),
-      };
-    }
   }
+
+  // Only load+align the recessions series when a spec actually asks for it
+  // -- most videos never touch it.
+  const needsRecessions = (spec.annotations ?? []).includes("recessions");
+  const recessionsAligned = needsRecessions ? alignToGrid(primaryData, seriesData("recessions")) : undefined;
+  const annotations = resolveAnnotations(
+    spec.annotations ?? [],
+    primaryData,
+    { i0: outerWinStart, i1: outerWinEnd },
+    state.xDomain,
+    state.shotProgress,
+    recessionsAligned
+  );
 
   const lineSeries: LineSeries[] = spec.series.map((s, i) => ({
     data: dataByRef[i],
@@ -157,8 +151,8 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
         unit={primaryMeta.units}
         zoomFactor={state.zoomFactor}
         palette={palette}
-        avgLine={avgLine}
         waypoints={waypoints}
+        annotations={annotations}
       />
     </ChartChrome>
   );

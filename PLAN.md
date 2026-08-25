@@ -10,7 +10,7 @@ breaking old specs.
 every future session start from the same place. It gets written incrementally,
 one section per phase, not all at the end.
 
-**Status.** Phases 0-3 are done. Repo lives at
+**Status.** Phases 0-4 are done. Repo lives at
 `~/Documents/GitHub/cool_tiktok_graphics`, pushed to
 `github.com/mtkonczal/cool_tiktok_graphics` (public, per an explicit choice —
 see Section 6). `data/series.json` and `data/fetch.R` exist; all five
@@ -66,10 +66,50 @@ relative `"-48m"` window and two zoom shots (out to full history, then back
 in) to confirm the new capabilities actually work end to end, not just that
 the refactor preserved old behavior.
 
-`fade` and `pan` are implemented in the engine but not yet used by any real
-spec — `pan`'s math is identical to `zoom`'s (proven above), and `fade`
-returns an `opacity` value `LineBody` doesn't consume yet, waiting for
-Phase 4's annotation layer to have something to fade in.
+`fade` is implemented in the engine but still has no consumer (its
+`opacity` output is now used, by annotations' from/until fading, but no
+spec uses a `fade` *shot* yet). `pan`'s math was proven identical to
+`zoom`'s in Phase 3.
+
+Phase 4 added `src/engine/annotations.ts` (hline/vline/band/point/free) and
+generalized the one bespoke reference-line prop the line bodies always had
+(`LineChartBody`'s `avgLine`, unchanged in spirit since the very first
+version) into that vocabulary. `prime-epop-zoomout.json`'s average line is
+now an `hline` annotation (`"value": "mean:2024-01-01..latest"`, `"from":
+"zoom"`) — matches PLAN.md Section 2c's own example almost verbatim. Value/
+position/label are pixel-identical to the old bespoke version; the one
+deliberate, intentional change is that it now fades in smoothly across the
+zoom shot instead of snapping on at the shot's first frame, since PLAN.md
+Section 2f specifies every annotation kind fades via from/until uniformly.
+
+A `"recessions"` shorthand expands to one unlabeled band per NBER
+recession, sourced from a new `recessions` registry entry (FRED's `USREC`,
+fetched the same way as every other series) and aligned onto the primary
+series' date grid before scanning for contiguous 1-runs, the same
+`alignToGrid` two-series charts already needed. Bands get a 4px render-width
+floor so a 1-2 month recession doesn't just vanish once a chart is zoomed
+out to decades — verified against the 1990-91, 2001, and 2008-09 recessions
+rendering as proportionally-sized shaded bands. The 2020 COVID recession
+resolves correctly too but isn't visually distinguishable in a fully
+zoomed-out view: its 2-month band is genuinely narrower than the chart's
+own 21px line stroke, which is drawn on top and happens to pass through
+exactly that point (the sharpest move in the entire series). Not a bug, a
+real coincidence at that specific zoom level -- worth knowing about, not
+worth fixing (a full-frame band-vs-line z-order swap would look worse for
+every other case to fix one edge case).
+
+`ListRevealBody`'s row height is now `min(300, available-height /
+item-count)` instead of a fixed 300 -- 2-3 items still get exactly the
+original 300px rows (verified byte-identical), 4-6 items shrink to fit
+`TEXTSAFE` instead of running off the bottom (verified visually at 4 and 6
+items).
+
+`render-cards.sh` and `render-list-cards.sh` are gone, replaced by one
+`make.sh` that detects a cards file's entry shape (`items` present -> list
+reveal, otherwise rip-card) and dispatches accordingly -- verified
+byte-identical output against both old scripts. This is only the card-render
+piece of Phase 5's fuller `make.sh` (spec-driven renders, freshness checks,
+schema validation, dated output names).
 
 Section 7 has every environment fact verified before the move, so a fresh
 session can start without re-checking any of it.

@@ -15,7 +15,8 @@ import {
 } from "../engine/scales";
 import { Unit, fmtAxis } from "../engine/format";
 import { Waypoint } from "../engine/waypoints";
-import { MARK, MAX_LABEL_SHRINK, PETROL, Palette, PLOT, ROW, STROKE, TYPE } from "../theme";
+import { ResolvedAnnotation } from "../engine/annotations";
+import { MARK, MAX_LABEL_SHRINK, PETROL, Palette, PLOT, ROW, STROKE, TEXTSAFE, TYPE } from "../theme";
 
 // The reusable line-chart body: 1 series gets the full reveal treatment
 // (waypoint callouts that pop in and shrink with zoom, an optional reference
@@ -35,14 +36,6 @@ import { MARK, MAX_LABEL_SHRINK, PETROL, Palette, PLOT, ROW, STROKE, TYPE } from
 //   3. In single-series mode, the latest point is the same knockout-circle
 //      mark as every other waypoint, just filled in the accent color -- "now"
 //      reads by color, not by switching shape.
-export type AvgLine = {
-  value: number;
-  label: string;
-  leftIdx: number;
-  rightIdx: number;
-  labelIdx: number;
-};
-
 export type LineSeries = {
   data: DataRow[];
   label?: string;
@@ -70,10 +63,25 @@ export const LineBody: React.FC<{
   unit: Unit;
   zoomFactor?: number;
   palette?: Palette;
-  avgLine?: AvgLine;
   waypoints?: Waypoint[];
-}> = ({ series, xDomain, yDomain, i0, tipExact, unit, zoomFactor = 1, palette = PETROL, avgLine, waypoints = [] }) => {
+  annotations?: ResolvedAnnotation[];
+}> = ({
+  series,
+  xDomain,
+  yDomain,
+  i0,
+  tipExact,
+  unit,
+  zoomFactor = 1,
+  palette = PETROL,
+  waypoints = [],
+  annotations = [],
+}) => {
   const primary = series[0].data;
+  // Dot marks and label text shrink with zoom the same way waypoints do --
+  // shared across both series-count branches since hline/vline/point labels
+  // render regardless of which one is active.
+  const textZoom = Math.min(zoomFactor, MAX_LABEL_SHRINK);
   const yStep = chooseYStep(yDomain);
   const yTicks: number[] = [];
   for (let yv = Math.ceil(yDomain[0] / yStep) * yStep; yv <= yDomain[1]; yv += yStep) yTicks.push(yv);
@@ -142,45 +150,153 @@ export const LineBody: React.FC<{
     </>
   );
 
+  // Bands render behind everything (shading, not a mark); hline/vline behind
+  // the series lines (reference context, not the point of the frame); point/
+  // free render last, on top of the data. All three groups are shared across
+  // both series-count branches -- an annotation doesn't care whether it's
+  // decorating one line or two.
+  const bands = annotations.filter((a): a is Extract<ResolvedAnnotation, { kind: "band" }> => a.kind === "band");
+  const MIN_BAND_WIDTH = 4; // a 1-2 month recession is sub-pixel wide once zoomed out to 30 years -- floor it so it doesn't just vanish
+  const bandEls = bands.map((b, i) => {
+    let x1 = Math.max(PLOT.left, Math.min(PLOT.right, px(b.i0, xDomain)));
+    let x2 = Math.max(PLOT.left, Math.min(PLOT.right, px(b.i1, xDomain)));
+    if (x2 - x1 < MIN_BAND_WIDTH) {
+      const mid = (x1 + x2) / 2;
+      x1 = mid - MIN_BAND_WIDTH / 2;
+      x2 = mid + MIN_BAND_WIDTH / 2;
+    }
+    if (x2 <= x1) return null;
+    return (
+      <g key={`band-${i}`} opacity={b.opacity}>
+        <rect x={x1} y={PLOT.top} width={x2 - x1} height={PLOT.bottom - PLOT.top} fill={palette.dim} fillOpacity={0.15} />
+        {b.label && (
+          <text
+            x={(x1 + x2) / 2}
+            y={PLOT.top + 36}
+            fontSize={TYPE.axis.size * 0.8}
+            fontFamily={TYPE.axis.family}
+            fontWeight={TYPE.axis.weight}
+            fill={palette.dim}
+            textAnchor="middle"
+          >
+            {b.label}
+          </text>
+        )}
+      </g>
+    );
+  });
+
+  const hlines = annotations.filter((a): a is Extract<ResolvedAnnotation, { kind: "hline" }> => a.kind === "hline");
+  const hlineEls = hlines.map(
+    (h, i) =>
+      h.leftIdx < h.rightIdx && (
+        <g key={`hline-${i}`} opacity={h.opacity}>
+          <line
+            x1={px(h.leftIdx, xDomain)}
+            y1={py(h.value, yDomain)}
+            x2={px(h.rightIdx, xDomain)}
+            y2={py(h.value, yDomain)}
+            stroke={palette.dim}
+            strokeWidth={STROKE.tick}
+            strokeDasharray={STROKE.dash}
+          />
+          {h.leftIdx <= h.labelIdx && (
+            <text
+              x={px(h.labelIdx, xDomain)}
+              y={py(h.value, yDomain) - 22}
+              fontSize={TYPE.axis.size / textZoom}
+              fontFamily={TYPE.axis.family}
+              fontWeight={TYPE.axis.weight}
+              fill={palette.dim}
+              textAnchor={svgAnchor(haFor(h.labelIdx, xDomain))}
+            >
+              {h.label}
+            </text>
+          )}
+        </g>
+      )
+  );
+
+  const vlines = annotations.filter((a): a is Extract<ResolvedAnnotation, { kind: "vline" }> => a.kind === "vline");
+  const vlineEls = vlines.map((v, i) => (
+    <g key={`vline-${i}`} opacity={v.opacity}>
+      <line
+        x1={px(v.idx, xDomain)}
+        y1={PLOT.top}
+        x2={px(v.idx, xDomain)}
+        y2={PLOT.bottom}
+        stroke={palette.dim}
+        strokeWidth={STROKE.tick}
+        strokeDasharray={STROKE.dash}
+      />
+      <text
+        x={px(v.idx, xDomain)}
+        y={PLOT.top - 12}
+        fontSize={TYPE.axis.size / textZoom}
+        fontFamily={TYPE.axis.family}
+        fontWeight={TYPE.axis.weight}
+        fill={palette.dim}
+        textAnchor="middle"
+      >
+        {v.label}
+      </text>
+    </g>
+  ));
+
+  const points = annotations.filter((a): a is Extract<ResolvedAnnotation, { kind: "point" }> => a.kind === "point");
+  const POINT_LEADER = 48;
+  const pointEls = points.map((p, i) => {
+    const cx = px(p.idx, xDomain);
+    const cy = py(p.value, yDomain);
+    const anchor = svgAnchor(haFor(p.idx, xDomain));
+    return (
+      <g key={`point-${i}`} opacity={p.opacity}>
+        <circle cx={cx} cy={cy} r={MARK.waypoint / zoomFactor} fill={palette.accent} />
+        <circle cx={cx} cy={cy} r={MARK.waypointCore / zoomFactor} fill={palette.bg} />
+        <line x1={cx} y1={cy - MARK.waypoint / zoomFactor} x2={cx} y2={cy - POINT_LEADER} stroke={palette.dim} strokeWidth={STROKE.tick} />
+        <text
+          x={cx}
+          y={cy - POINT_LEADER - 10}
+          fontSize={TYPE.date.size / textZoom}
+          fontFamily={TYPE.date.family}
+          fontWeight={TYPE.date.weight}
+          fill={palette.text}
+          textAnchor={anchor}
+        >
+          {p.label}
+        </text>
+      </g>
+    );
+  });
+
+  const frees = annotations.filter((a): a is Extract<ResolvedAnnotation, { kind: "free" }> => a.kind === "free");
+  const freeEls = frees.map((f, i) => (
+    <text
+      key={`free-${i}`}
+      x={TEXTSAFE.x + f.x * TEXTSAFE.w}
+      y={TEXTSAFE.y + f.y * TEXTSAFE.h}
+      textAnchor={f.align}
+      fontSize={TYPE.value.size}
+      fontFamily={TYPE.value.family}
+      fontWeight={TYPE.value.weight}
+      fill={palette.text}
+      opacity={f.opacity}
+    >
+      {f.label}
+    </text>
+  ));
+
   if (series.length === 1) {
     const data = primary;
-    const textZoom = Math.min(zoomFactor, MAX_LABEL_SHRINK);
     const { runs, tipVal } = buildRuns(data, i0, tipExact);
     const d = pathD(runs, xDomain, yDomain);
 
     return (
       <>
+        {bandEls}
         {chrome}
-
-        {/* reference line: grows backward in from the tip as the composition
-            zooms out (leftIdx tracks xDomain[0]) -- the label only appears
-            once the line has grown back far enough to reach it. */}
-        {avgLine && avgLine.leftIdx < avgLine.rightIdx && (
-          <>
-            <line
-              x1={px(avgLine.leftIdx, xDomain)}
-              y1={py(avgLine.value, yDomain)}
-              x2={px(avgLine.rightIdx, xDomain)}
-              y2={py(avgLine.value, yDomain)}
-              stroke={palette.dim}
-              strokeWidth={STROKE.tick}
-              strokeDasharray={STROKE.dash}
-            />
-            {avgLine.leftIdx <= avgLine.labelIdx && (
-              <text
-                x={px(avgLine.labelIdx, xDomain)}
-                y={py(avgLine.value, yDomain) - 22}
-                fontSize={TYPE.axis.size / textZoom}
-                fontFamily={TYPE.axis.family}
-                fontWeight={TYPE.axis.weight}
-                fill={palette.dim}
-                textAnchor={svgAnchor(haFor(avgLine.labelIdx, xDomain))}
-              >
-                {avgLine.label}
-              </text>
-            )}
-          </>
-        )}
+        {hlineEls}
+        {vlineEls}
 
         {/* the series: knockout stroke, then the real one */}
         {d && (
@@ -317,6 +433,9 @@ export const LineBody: React.FC<{
             );
           });
         })()}
+
+        {pointEls}
+        {freeEls}
       </>
     );
   }
@@ -384,9 +503,14 @@ export const LineBody: React.FC<{
 
   return (
     <>
+      {bandEls}
       {chrome}
+      {hlineEls}
+      {vlineEls}
       {series.map((s) => renderLine(s).el)}
       {series.map((s, i) => renderLabel(s, i % 2 === 0 ? "below" : "above"))}
+      {pointEls}
+      {freeEls}
     </>
   );
 };

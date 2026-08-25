@@ -18,11 +18,15 @@
   "waypointFade": {
     "token": "2023-05-01"
   },
-  "avg": {
-    "from": "2024-01-01",
-    "label": "2024–2026 average",
-    "labelAt": "2008-09-01"
-  },
+  "annotations": [
+    {
+      "kind": "hline",
+      "value": "mean:2024-01-01..latest",
+      "label": "2024–2026 average",
+      "labelAt": "2008-09-01",
+      "from": "zoom"
+    }
+  ],
   "shots": [
     {
       "kind": "draw",
