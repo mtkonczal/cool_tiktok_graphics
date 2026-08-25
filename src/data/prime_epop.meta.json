@@ -1,0 +1,12 @@
+{
+  "name": "prime_epop",
+  "source": "fred",
+  "fetched_at": "2026-08-25T02:06:42Z",
+  "units": "percent",
+  "decimals": 1,
+  "row_count": 943,
+  "first_date": "1948-01-01",
+  "last_date": "2026-07-01",
+  "last_value": 80.4,
+  "fred_id": "LNS12300060"
+}

@@ -1,0 +1,51 @@
+{
+  "prime_epop": {
+    "source": "fred",
+    "id": "LNS12300060",
+    "units": "percent",
+    "decimals": 1,
+    "title": "Prime-age employment rate",
+    "subtitle": "Employed share of the population, ages 25-54",
+    "note": "Used at two windows in the current videos (data_1995_present.json, data_2019_present.json). Both are slices of this same series; Phase 2's spec windows replace the need for two files."
+  },
+  "unrate": {
+    "source": "derived",
+    "inputs": { "u": "UNEMPLOY", "lf": "CLF16OV" },
+    "expr": "100 * u / lf",
+    "units": "percent",
+    "decimals": 4,
+    "title": "Unemployment rate",
+    "subtitle": "Unemployed share of the labor force",
+    "note": "Computed from components, not the pre-rounded published UNRATE release, so waypoint ordering stays stable at one decimal on screen even though four decimals are stored. Verified 2026-08-24 against data_unrate_2022_present.json: exact match to 4 decimals for every row in the committed window."
+  },
+  "unemployed": {
+    "source": "fred",
+    "id": "UNEMPLOY",
+    "units": "count",
+    "decimals": 0,
+    "scale": "thousands",
+    "title": "Unemployed",
+    "subtitle": "Number of unemployed people, seasonally adjusted",
+    "note": "Raw FRED units are thousands of persons. Has a real one-month gap at 2025-10-01 (BLS did not publish that month); buildRuns already renders JSON null as a gap."
+  },
+  "openings": {
+    "source": "fred",
+    "id": "JTSJOL",
+    "units": "count",
+    "decimals": 0,
+    "scale": "thousands",
+    "title": "Job openings",
+    "subtitle": "Total nonfarm job openings, seasonally adjusted",
+    "note": "Raw FRED units are thousands. Series starts December 2000 (JOLTS history) — the JSON file itself starts there, no leading nulls, since fetch.R pulls each series alone rather than padding it against a longer one."
+  },
+  "vu_ratio": {
+    "source": "derived",
+    "inputs": { "v": "JTSJOL", "u": "UNEMPLOY" },
+    "expr": "v / u",
+    "units": "ratio",
+    "decimals": 2,
+    "title": "Vacancy-to-unemployment ratio",
+    "subtitle": "Job openings per unemployed worker",
+    "note": "Not used by any current video. Registered now because its title already appears as list-card copy in src/data/cards_full_employment_reasons.json; a chart for it is a plausible near-term ask."
+  }
+}

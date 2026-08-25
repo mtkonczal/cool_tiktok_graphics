@@ -10,9 +10,17 @@ breaking old specs.
 every future session start from the same place. It gets written incrementally,
 one section per phase, not all at the end.
 
-**Status.** Nothing below has been built yet. This file is the plan and the
-handoff. Section 7 has every environment fact I verified, so a fresh session in
-the new location can start without re-checking any of it.
+**Status.** Phase 0 and Phase 1 are done. Repo lives at
+`~/Documents/GitHub/cool_tiktok_graphics`, pushed to
+`github.com/mtkonczal/cool_tiktok_graphics` (public, per an explicit choice —
+see Section 6). `data/series.json` and `data/fetch.R` exist; all five
+series behind the existing videos were regenerated from FRED and matched the
+committed legacy JSON exactly, decimal for decimal, so none of the provenance
+guesses in Section 7's table turned out to be wrong. The legacy
+`src/data/data_*.json` files are untouched and still what the six current
+compositions import — rewiring them onto the registry is Phase 2's job, not
+done yet. Section 7 has every environment fact verified before the move, so a
+fresh session can start without re-checking any of it.
 
 ---
 
@@ -529,10 +537,10 @@ build-up plus its three charts becomes one video. Then write `CLAUDE.md` in full
 
 ## 6. Open decisions
 
-1. **Repo name.** `remotion-tiktok` is the folder name today but describes the
-   tool, not the work. `econ-video-factory` or `tiktok-econ-charts` would age
-   better. Decide before Step 6, since the remote takes the name.
-2. **Private or public.** Recommending private to start. One command to flip.
+1. ~~**Repo name.**~~ Decided: `cool_tiktok_graphics`, matching the remote
+   that already existed under that name. Folder, `package.json`, and GitHub
+   all agree as of Phase 0.
+2. ~~**Private or public.**~~ Decided: public, kept as it already was.
 3. **Palette default.** Petrol (dark) for everything, or dark for charts and
    paper (light) for cards? Right now everything is petrol and `PAPER` is unused.
 4. **Sequence stitching.** Worth building in Phase 5, or do you assemble clips
