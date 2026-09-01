@@ -1,0 +1,13 @@
+{
+  "id": "prime-epop-participation-2025",
+  "series": [{ "ref": "prime_epop" }, { "ref": "prime_lfpr" }],
+  "chrome": {
+    "title": "Employment & participation",
+    "subtitle": "Ages 25–54, percent of population"
+  },
+  "window": ["2025-01-01", "latest"],
+  "shots": [
+    { "kind": "draw", "seconds": 4.5 },
+    { "kind": "hold", "seconds": 6 }
+  ]
+}

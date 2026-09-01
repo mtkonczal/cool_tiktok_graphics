@@ -19,8 +19,18 @@ export type Palette = {
   dim: string;
   series: string;
   accent: string;
+  seriesAlt: string;
 };
 
+// seriesAlt: a third categorical color, for the one chart type (grouped bars)
+// that needs three data colors instead of two. mikekonczal.com's stylesheet
+// has no third token to lift (checked -- just the blue scale plus the one
+// hardcoded copper), so this is a documented derivation using the same
+// method as `series`/`accent` above: fixed hue (152deg, an emerald green
+// clearly distinct from chart-blue's ~213deg and copper's ~27deg), HLS
+// lightened for the dark petrol background / darkened for the light paper
+// background, searched for a contrast ratio matching this palette's other
+// two colors on their own background (petrol ~6:1, paper ~5:1).
 export const PETROL: Palette = {
   bg: "#0e2c33",     // --mk-blue-900
   grid: "#1C4A50",   // blue-900 -> blue-500 @ 45%.  1.50:1, recessive on purpose
@@ -28,6 +38,7 @@ export const PETROL: Palette = {
   dim: "#6fa3a6",    // --mk-blue-300            5.23:1
   series: "#81AADB", // --mk-chart-blue +45% L    6.10:1
   accent: "#e0a06a", // the site copper           6.59:1  -- used once per frame
+  seriesAlt: "#4ebc88", // hue 152, L .52 S .45    6.20:1
 };
 
 export const PAPER: Palette = {
@@ -37,6 +48,7 @@ export const PAPER: Palette = {
   dim: "#6a7577",    // --mk-mute
   series: "#3067a8", // --mk-chart-blue, untouched -- it works at full strength on light
   accent: "#9D5518", // copper -45% L; raw copper is only 2.17:1 on this ground
+  seriesAlt: "#206f4a", // hue 152, L .28 S .55    5.48:1
 };
 
 // ── Frame geometry ────────────────────────────────────────────────────────
@@ -61,6 +73,11 @@ export const ROW = {
   xaxisLabel: 508,
   xaxisRule: 538,
   xaxisTick: 20,
+  // A two-line x-axis tick (month above, year below -- engine/scales.ts's
+  // xAxisTicks) stacks upward from xaxisLabel by this much per extra line,
+  // so every tick's bottom line still lands at xaxisLabel regardless of how
+  // many lines it has.
+  xaxisLabelLineHeight: 38,
 } as const;
 
 export const PLOT = { left: 150, right: 898, top: 640, bottom: 1420 } as const;

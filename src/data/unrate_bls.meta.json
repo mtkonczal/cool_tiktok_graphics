@@ -1,0 +1,16 @@
+{
+  "name": "unrate_bls",
+  "source": "bls",
+  "fetched_at": "2026-09-01T20:22:11Z",
+  "units": "percent",
+  "decimals": 4,
+  "row_count": 199,
+  "first_date": "2010-01-01",
+  "last_date": "2026-07-01",
+  "last_value": 4.09,
+  "bls_ids": [
+    "LNS13000000",
+    "LNS11000000"
+  ],
+  "expr": "100 * LNS13000000 / LNS11000000"
+}

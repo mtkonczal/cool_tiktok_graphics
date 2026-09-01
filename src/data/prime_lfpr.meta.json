@@ -1,0 +1,12 @@
+{
+  "name": "prime_lfpr",
+  "source": "fred",
+  "fetched_at": "2026-09-01T19:58:30Z",
+  "units": "percent",
+  "decimals": 1,
+  "row_count": 943,
+  "first_date": "1948-01-01",
+  "last_date": "2026-07-01",
+  "last_value": 83.4,
+  "fred_id": "LNS11300060"
+}

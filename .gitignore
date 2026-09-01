@@ -25,3 +25,10 @@ out/
 # published video actually showed. The JSON plus its .meta.json sidecar is
 # the vintage record of what went on screen. A few KB each. Nothing above
 # matches src/data/, so they are tracked; keep it that way.
+
+# ── jobs-day/data/: scraped raw input, not the vintage record ────────────
+# jobs-day/scrape_revisions.py's CSV is intermediate input to data/fetch.R's
+# "bls_scrape" source, not the committed vintage -- src/data/payrolls_change_1st.json
+# + its .meta.json (already covered by the src/data/ carve-out above) is the
+# thing that's actually committed for provenance, same rule as everywhere else.
+jobs-day/data/

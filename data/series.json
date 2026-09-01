@@ -5,12 +5,24 @@
     "units": "percent",
     "decimals": 1,
     "title": "Prime-age employment rate",
-    "subtitle": "Employed share of the population, ages 25–54",
+    "subtitle": "Employed share of the population, ages 25\u201354",
     "note": "Used at two windows in the current videos (data_1995_present.json, data_2019_present.json). Both are slices of this same series; Phase 2's spec windows replace the need for two files."
+  },
+  "prime_lfpr": {
+    "source": "fred",
+    "id": "LNS11300060",
+    "units": "percent",
+    "decimals": 1,
+    "title": "Prime-age labor force participation",
+    "subtitle": "Labor force share of the population, ages 25\u201354",
+    "note": "Companion series to prime_epop -- same BLS LNS convention (12 = employment-population ratio, 11 = labor force participation rate), same age slice, same population base. LFPR >= EPOP always (everyone employed is in the labor force; the gap is the unemployed share). Added for a 2-line 'employment vs. participation' comparison video, not a replacement for prime_epop."
   },
   "unrate": {
     "source": "derived",
-    "inputs": { "u": "UNEMPLOY", "lf": "CLF16OV" },
+    "inputs": {
+      "u": "UNEMPLOY",
+      "lf": "CLF16OV"
+    },
     "expr": "100 * u / lf",
     "units": "percent",
     "decimals": 4,
@@ -34,11 +46,14 @@
     "decimals": 0,
     "title": "Job openings",
     "subtitle": "Total nonfarm job openings, seasonally adjusted",
-    "note": "Raw FRED units are thousands. Series starts December 2000 (JOLTS history) — the JSON file itself starts there, no leading nulls, since fetch.R pulls each series alone rather than padding it against a longer one."
+    "note": "Raw FRED units are thousands. Series starts December 2000 (JOLTS history) \u2014 the JSON file itself starts there, no leading nulls, since fetch.R pulls each series alone rather than padding it against a longer one."
   },
   "vu_ratio": {
     "source": "derived",
-    "inputs": { "v": "JTSJOL", "u": "UNEMPLOY" },
+    "inputs": {
+      "v": "JTSJOL",
+      "u": "UNEMPLOY"
+    },
     "expr": "v / u",
     "units": "ratio",
     "decimals": 2,
@@ -54,5 +69,55 @@
     "title": "NBER recession indicator",
     "subtitle": "1 during an NBER-dated recession month, 0 otherwise",
     "note": "Not a chart series -- never plotted or formatted as a value. Phase 4's engine/annotations.ts scans this for contiguous 1-runs to build the built-in \"recessions\" band shorthand. Fetched through the same registry/fetch.R mechanism as everything else so it gets the same vintage tracking, not because it's a line anyone would draw."
+  },
+  "unrate_bls": {
+    "source": "bls",
+    "ids": [
+      "LNS13000000",
+      "LNS11000000"
+    ],
+    "expr": "100 * LNS13000000 / LNS11000000",
+    "units": "percent",
+    "decimals": 4,
+    "title": "Unemployment rate",
+    "subtitle": "Unemployed share of the labor force",
+    "note": "Same construction as `unrate` (100 * unemployment level / labor force level) but pulled directly from the BLS public API (LNS13000000 / LNS11000000) instead of FRED's UNEMPLOY/CLF16OV mirror -- for jobs-day use, when BLS publishes before FRED has synced same-day. Requires BLS_KEY in the environment (see data/fetch.R's \"bls\" source). Kept as a separate registry entry from `unrate` rather than replacing it, per CLAUDE.md Section 11's rule against silently changing a series' source."
+  },
+  "payrolls_change_1st": {
+    "source": "bls_scrape",
+    "field": "sa_1st",
+    "units": "count",
+    "decimals": 0,
+    "title": "Monthly job growth",
+    "subtitle": "Nonfarm payrolls, thousands, as first reported",
+    "note": "Not a BLS API series -- scraped from the BLS CES revisions table (https://www.bls.gov/web/empsit/cesnaicsrev.htm) by jobs-day/scrape_revisions.py, the same page and parsing logic BLS-CPS-Jobs-Numbers/99_download_jobs_revisions.py uses. `sa_1st` is the FIRST published estimate for each month -- the number that actually printed on that month's jobs day -- not the current (possibly twice-revised) CES0000000001 level, so a given month's value here is frozen once printed. This is deliberately a different number from what a FRED-based `payrolls`-style series would give you by differencing CES0000000001, which reflects only the latest revision. See jobs-day/README.md."
+  },
+  "payrolls_change_2nd": {
+    "source": "bls_scrape",
+    "field": "sa_2nd",
+    "units": "count",
+    "decimals": 0,
+    "title": "Monthly job growth (2nd estimate)",
+    "subtitle": "Nonfarm payrolls, thousands, as 2nd reported",
+    "note": "Same scrape/table as `payrolls_change_1st` (see its note) -- `sa_2nd` is that month's SECOND published estimate (one month after the first print), still not the current fully-revised CES0000000001 level. Exists so the jobs-day grouped-bar revisions chart (BarVideo) can show 1st/2nd/3rd side by side, matching BLS-CPS-Jobs-Numbers/01_initial_tweet.R's left panel. See jobs-day/README.md."
+  },
+  "payrolls_change_3rd": {
+    "source": "bls_scrape",
+    "field": "sa_3rd",
+    "units": "count",
+    "decimals": 0,
+    "title": "Monthly job growth (3rd estimate)",
+    "subtitle": "Nonfarm payrolls, thousands, as 3rd reported",
+    "note": "Same scrape/table as `payrolls_change_1st` (see its note) -- `sa_3rd` is that month's THIRD published estimate (two months after the first print). BLS considers a print settled after the third estimate, though it can still be touched by later annual benchmark revisions, which this table does not carry. See jobs-day/README.md."
+  },
+  "payrolls_change": {
+    "source": "bls",
+    "ids": ["CES0000000001"],
+    "expr": "CES0000000001 - dplyr::lag(CES0000000001, 1)",
+    "units": "count",
+    "decimals": 0,
+    "title": "Total employment",
+    "subtitle": "Monthly change in total nonfarm payrolls",
+    "note": "Deliberately NOT the same number as `payrolls_change_1st`/`_2nd`/`_3rd`. Those are frozen at whichever estimate vintage they name, scraped from BLS's revisions table. This is CES0000000001 (total nonfarm employment level, SA) differenced month-over-month via the BLS API -- so every historical month here reflects however many rounds of revision have landed since, i.e. the CURRENT best-known change, the number a chart drawn today would headline. Matches the `ces = CES0000000001 - lag(CES0000000001, 1)` pattern in BLS-CPS-Jobs-Numbers/00_run_monthly.R and /02_unrate_jobs.R exactly. Pick this one for \"what's the picture right now\"; pick `payrolls_change_1st` for \"what did the headline say that month.\""
   }
 }

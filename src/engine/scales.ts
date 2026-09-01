@@ -180,3 +180,88 @@ export function yearStep(xDomain: [number, number]): number {
   const yearsVisible = (xDomain[1] - xDomain[0]) / 12;
   return yearsVisible > 18 ? 5 : yearsVisible > 9 ? 2 : 1;
 }
+
+const MONTH_ABBR = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// A tick's `lines` renders as a stacked label, bottom line anchored at the
+// axis, earlier lines stacked above it -- ["’25"] for a bare-year tick,
+// ["Jan", "’25"] for a month+year one. See xAxisTicks below.
+export type AxisTick = { idx: number; lines: string[] };
+
+function yearLabel(year: number): string {
+  return `’${String(year).slice(2)}`;
+}
+
+// x-axis tick selection, graduated by how much time is actually on screen --
+// a multi-decade view (prime-epop-zoomout's zoomed-out shot) reading "every
+// January" (thinned by yearStep) is still right, but for anything under ~2.5
+// years that degenerates to 1-2 ticks total, which doesn't give a viewer any
+// way to place a callout against the timeline. Below that threshold, ticks
+// are picked by calendar month instead, spaced out (every month, every 2nd,
+// 3rd, or 6th) to land at roughly <=8 ticks -- the count this project's other
+// axis (BarBody's, one tick per bar-group) tops out at before labels start
+// crowding at TYPE.axis size. Every one of those ticks shows month AND year,
+// stacked two lines ("Jan" / "’25") rather than the year only at a rollover
+// -- less to visually parse per tick than "Jan '25" inline, and consistent
+// whether or not this is the first tick on screen.
+//
+// Both tiers also always end on iHi -- the actual rightmost visible date --
+// even when that doesn't fall on the tier's normal cadence (a January for
+// the wide tier, an every-Nth-month boundary for the narrow one). Without
+// this, the axis's last labeled point could sit a stretch before the line's
+// own endpoint, leaving "where does the line actually end" unlabeled. The
+// wide tier's regular ticks stay bare-year (they're always January by
+// construction, so the month would be redundant); a forced end tick that
+// isn't itself a January still gets the month, since "’26" alone there would
+// misleadingly read as January.
+export function xAxisTicks(data: DataRow[], iLo: number, iHi: number): AxisTick[] {
+  const monthsVisible = iHi - iLo;
+
+  if (monthsVisible > 30) {
+    const step = yearStep([iLo, iHi]);
+    const idxs: number[] = [];
+    for (let i = iLo; i <= iHi; i++) {
+      const md = monthDate(data[i].date);
+      if (md.month === 1 && md.year % step === 0) idxs.push(i);
+    }
+    // Drop the last regular January tick whenever the true end has to be
+    // forced in -- by construction (the loop above only reaches iHi, never
+    // past it) that last regular tick is always LESS than a full step*12
+    // months before iHi, i.e. always closer than two regular ticks ever sit
+    // to each other, so keeping both risks crowding every time, not just
+    // sometimes -- unconditional pop is what a spacing check would always
+    // resolve to here anyway.
+    if (idxs[idxs.length - 1] !== iHi) {
+      idxs.pop();
+      idxs.push(iHi);
+    }
+    return idxs.map((i) => {
+      const md = monthDate(data[i].date);
+      return { idx: i, lines: md.month === 1 ? [yearLabel(md.year)] : [MONTH_ABBR[md.month], yearLabel(md.year)] };
+    });
+  }
+
+  let step = 6;
+  for (const s of [1, 2, 3, 6]) {
+    if (Math.ceil(monthsVisible / s) + 1 <= 8) {
+      step = s;
+      break;
+    }
+  }
+  const idxs: number[] = [];
+  for (let i = iLo; i <= iHi; i += step) idxs.push(i);
+  // Same reasoning as the wide tier above: the loop only ever reaches up to
+  // iHi, so whenever it lands short, the last regular tick is guaranteed
+  // less than one full step away -- always closer than any two regular
+  // ticks sit to each other -- so it always has to give way, not just when
+  // it happens to be especially close.
+  if (idxs[idxs.length - 1] !== iHi) {
+    idxs.pop();
+    idxs.push(iHi);
+  }
+
+  return idxs.map((i) => {
+    const md = monthDate(data[i].date);
+    return { idx: i, lines: [MONTH_ABBR[md.month], yearLabel(md.year)] };
+  });
+}

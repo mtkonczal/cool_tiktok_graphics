@@ -12,17 +12,37 @@ export type Waypoint = {
    * recent-history callout ceding the frame to a longer-range one) without
    * being removed from the array mid-animation. */
   opacity?: number;
+  /** How the label reads. "stacked" (default when omitted) is the original
+   * two-line date-above-value callout. "none" drops the date entirely --
+   * just the value, one line. "inline" keeps the date but puts it beside
+   * the value instead of above it, also one line. See LineSpec's
+   * `waypointHideDate`/`waypointBesideDot` (LineVideo.tsx) for how a spec
+   * sets this per waypoint. */
+  dateStyle?: "stacked" | "none" | "inline";
+  /** true: anchor the label at the point's own height (beside the dot)
+   * instead of the usual headroom-based position above it. For a tight
+   * cluster of recent points this reads as a little trailing readout next
+   * to the line rather than a stack of callouts floating above it. */
+  besideDot?: boolean;
 };
 
-// A waypoint token is either a resolver keyword or a literal "YYYY-MM-DD"
-// date. Resolvers are computed against a window (min/max: the visible date
-// range; latest: the last non-null row at or before the window's end) so a
-// spec written today still points at the right row next month -- this is
-// the fix for the stale hardcodes PLAN.md flagged (UnrateReveal's cycle
-// low/high were literal dates that silently went wrong once a new cycle
-// extreme printed). Literal dates ignore the window entirely; they're an
-// editorial pick ("this is the frame I want called out"), not a moving target.
+// A waypoint token is either a resolver keyword, a relative offset, or a
+// literal "YYYY-MM-DD" date. Resolvers are computed against a window
+// (min/max: the visible date range; latest: the last non-null row at or
+// before the window's end) so a spec written today still points at the
+// right row next month -- this is the fix for the stale hardcodes PLAN.md
+// flagged (UnrateReveal's cycle low/high were literal dates that silently
+// went wrong once a new cycle extreme printed). A relative offset like
+// "-1m"/"-2m" (N months before the window's end -- the same "-Nm" syntax
+// engine/shots.ts uses for shot windows, not a separate grammar) is for
+// "the last N months" as their own self-correcting waypoints, e.g.
+// `["min", "max", "-2m", "-1m", "latest"]` for "the historical extremes
+// plus the last three prints," none of which need editing as new months
+// arrive. Literal dates ignore the window entirely; they're an editorial
+// pick ("this is the frame I want called out"), not a moving target.
 export type WaypointToken = "min" | "max" | "latest" | string;
+
+const RELATIVE_RE = /^([+-]\d+)m$/;
 
 export function resolveIndex(data: DataRow[], token: WaypointToken, window?: { i0: number; i1: number }): number {
   if (token === "latest") {
@@ -46,6 +66,11 @@ export function resolveIndex(data: DataRow[], token: WaypointToken, window?: { i
     }
     if (best === -1) throw new Error(`resolveIndex: no data for "${token}" in the given window`);
     return best;
+  }
+  const rel = RELATIVE_RE.exec(token);
+  if (rel) {
+    const anchor = resolveIndex(data, "latest", window);
+    return anchor + parseInt(rel[1], 10);
   }
   const idx = findIdx(data, token);
   if (idx === -1) throw new Error(`resolveIndex: date "${token}" not found in series`);
@@ -109,6 +134,11 @@ export function makeWaypoints(
 // line descending from that peak. Drops that one callout below its dot
 // instead, using the domain floor as headroom rather than the domain top.
 export function belowDotOverride(wp: Waypoint, yDomainLo: number, pad: number): Waypoint {
-  const calloutYValue = wp.val - (wp.val - yDomainLo) * 0.2;
+  // 0.32, not the original 0.2 -- at 0.2 the label sat close enough to the
+  // dot that a steeply-descending final segment (e.g. unrate_bls dropping
+  // sharply into "latest") ran straight through the date line's text. 0.32
+  // clears that case (checked against a rendered frame) while still reading
+  // as "just below the dot," not stranded down near the axis.
+  const calloutYValue = wp.val - (wp.val - yDomainLo) * 0.32;
   return { ...wp, calloutYValue, calloutYDate: calloutYValue + pad * 0.6 };
 }

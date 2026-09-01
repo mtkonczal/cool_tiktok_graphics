@@ -1,0 +1,17 @@
+{
+  "id": "jobs-day-payrolls",
+  "type": "bar",
+  "chrome": {
+    "title": "Monthly job growth",
+    "subtitle": ""
+  },
+  "palette": "paper",
+  "series": [
+    { "ref": "payrolls_change_1st", "label": "1st estimate" },
+    { "ref": "payrolls_change_2nd", "label": "2nd estimate" },
+    { "ref": "payrolls_change_3rd", "label": "3rd estimate" }
+  ],
+  "window": ["2026-03-01", "latest"],
+  "revealSeconds": 4.0,
+  "holdSeconds": 5.5
+}

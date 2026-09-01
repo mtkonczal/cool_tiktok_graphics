@@ -13,11 +13,14 @@
 suppressPackageStartupMessages({
   library(tidyusmacro)
   library(jsonlite)
+  library(blsR)
 })
 
 args <- commandArgs(trailingOnly = TRUE)
 refresh <- "--refresh" %in% args
 names_arg <- setdiff(args, "--refresh")
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
 
 registry <- fromJSON("data/series.json", simplifyVector = FALSE)
 
@@ -87,6 +90,47 @@ fetch_one <- function(name, spec) {
     inputs <- spec$inputs
     df <- do.call(getFRED, inputs)
     df$value <- eval(parse(text = spec$expr), envir = df)
+  } else if (spec$source == "bls") {
+    # Direct BLS public API pull (blsR), for jobs-day use when BLS has
+    # published but FRED hasn't synced yet. One or more series IDs; with a
+    # single id and no expr, that id's own values are used as-is (mirrors
+    # "fred"). With 2+ ids, `expr` combines them exactly like "derived" does
+    # for FRED -- eval'd against columns named by BLS series ID, which is
+    # what blsR::get_n_series_table(..., tidy = TRUE) returns.
+    ids <- unlist(spec$ids %||% spec$id)
+    key <- Sys.getenv("BLS_KEY")
+    if (identical(key, "")) {
+      stop(name, ": BLS_KEY is not set (needed for source \"bls\")")
+    }
+    start_year <- if (!is.null(spec$start_year)) spec$start_year else 2010
+    end_year <- as.integer(format(Sys.Date(), "%Y"))
+    raw <- get_n_series_table(ids, api_key = key, start_year = start_year, end_year = end_year, tidy = TRUE)
+    for (id in ids) raw[[id]] <- as.numeric(raw[[id]])
+    raw$date <- as.Date(paste0(raw$year, "/", raw$month, "/", 1))
+    raw <- raw[order(raw$date), ]
+    df <- data.frame(date = raw$date)
+    df$value <- if (!is.null(spec$expr)) {
+      eval(parse(text = spec$expr), envir = raw)
+    } else {
+      raw[[ids[[1]]]]
+    }
+  } else if (spec$source == "bls_scrape") {
+    # Not the BLS API -- a scraped HTML table (jobs-day/scrape_revisions.py),
+    # for data the API doesn't carry (e.g. first-vs-revised CES prints). The
+    # scraper writes its own CSV; this just reads one column out of it as a
+    # {date, value} series. Run the scraper (or jobs-day/run_jobs_day.sh,
+    # which does it for you) before fetching a "bls_scrape" series.
+    csv_path <- spec$csv %||% "jobs-day/data/bls_ces_monthly_revisions.csv"
+    if (!file.exists(csv_path)) {
+      stop(name, ": ", csv_path, " not found -- run jobs-day/scrape_revisions.py first")
+    }
+    field <- spec$field
+    if (is.null(field)) stop(name, ": \"bls_scrape\" source requires a \"field\"")
+    rev <- read.csv(csv_path, stringsAsFactors = FALSE)
+    if (!(field %in% names(rev))) {
+      stop(name, ": field '", field, "' not found in ", csv_path)
+    }
+    df <- data.frame(date = as.Date(rev$date), value = as.numeric(rev[[field]]))
   } else {
     stop(name, ": unknown source '", spec$source, "'")
   }
@@ -118,9 +162,15 @@ fetch_one <- function(name, spec) {
   )
   if (spec$source == "fred") {
     meta$fred_id <- spec$id
-  } else {
+  } else if (spec$source == "derived") {
     meta$fred_inputs <- spec$inputs
     meta$expr <- spec$expr
+  } else if (spec$source == "bls") {
+    meta$bls_ids <- spec$ids %||% spec$id
+    if (!is.null(spec$expr)) meta$expr <- spec$expr
+  } else if (spec$source == "bls_scrape") {
+    meta$bls_scrape_field <- spec$field
+    meta$bls_scrape_csv <- spec$csv %||% "jobs-day/data/bls_ces_monthly_revisions.csv"
   }
   write(toJSON(meta, auto_unbox = TRUE, null = "null", digits = NA, pretty = TRUE), meta_path)
 

@@ -49,7 +49,7 @@ function isShotToken(v) {
   return isAbsoluteToken(v) || (isString(v) && RELATIVE_RE.test(v));
 }
 function isWaypointToken(v) {
-  return v === "min" || v === "max" || isAbsoluteToken(v);
+  return v === "min" || v === "max" || isShotToken(v);
 }
 
 function checkWindow(win, where, { allowRelative } = {}) {
@@ -113,6 +113,8 @@ function main() {
 
   if (spec.type === "sequence") {
     validateSequence(spec, file);
+  } else if (spec.type === "bar") {
+    validateBarSpec(spec, file);
   } else {
     validateLineSpec(spec, file);
   }
@@ -130,7 +132,8 @@ function validateSequence(spec, file) {
     fail("steps: required non-empty array");
     return;
   }
-  const COMPOSITIONS = ["LineVideo", "RipCardReveal", "ListReveal"];
+  const COMPOSITIONS = ["LineVideo", "BarVideo", "RipCardReveal", "ListReveal"];
+  const SPEC_FILE_COMPOSITIONS = ["LineVideo", "BarVideo"];
   spec.steps.forEach((step, i) => {
     if (!isString(step.composition) || !COMPOSITIONS.includes(step.composition)) {
       fail(`steps[${i}].composition: required, must be one of ${COMPOSITIONS.join("/")}`);
@@ -141,8 +144,8 @@ function validateSequence(spec, file) {
     if (step.spec === undefined && step.props === undefined) {
       fail(`steps[${i}]: needs either "spec" (a spec file path) or "props" (inline props)`);
     }
-    if (step.spec !== undefined && step.composition !== "LineVideo") {
-      fail(`steps[${i}]: "spec" is only for composition "LineVideo" -- ${step.composition} takes inline "props"`);
+    if (step.spec !== undefined && !SPEC_FILE_COMPOSITIONS.includes(step.composition)) {
+      fail(`steps[${i}]: "spec" is only for ${SPEC_FILE_COMPOSITIONS.join("/")} -- ${step.composition} takes inline "props"`);
     }
     if (step.spec !== undefined) {
       if (!isString(step.spec)) {
@@ -156,10 +159,50 @@ function validateSequence(spec, file) {
           fail(`steps[${i}].spec: cannot read/parse "${step.spec}" (${e.message})`);
           return;
         }
-        validateLineSpec(stepSpec, step.spec);
+        if (step.composition === "BarVideo") validateBarSpec(stepSpec, step.spec);
+        else validateLineSpec(stepSpec, step.spec);
       }
     }
   });
+}
+
+function validateBarSpec(spec, file) {
+  const registry = JSON.parse(readFileSync(path.join(REPO_ROOT, "data", "series.json"), "utf8"));
+
+  if (!isString(spec.id)) fail("id: required string");
+
+  if (!Array.isArray(spec.series) || spec.series.length < 2 || spec.series.length > 3) {
+    fail("series: required array of 2-3 { ref, label }");
+  } else {
+    spec.series.forEach((s, i) => {
+      if (!isPlainObject(s) || !isString(s.ref) || !isString(s.label)) {
+        fail(`series[${i}]: must be an object { "ref": string, "label": string }`);
+      } else if (!(s.ref in registry)) {
+        fail(`series[${i}].ref: "${s.ref}" is not in data/series.json`);
+      }
+    });
+  }
+
+  if (spec.chrome !== undefined) {
+    if (!isPlainObject(spec.chrome)) fail("chrome: must be an object");
+    else {
+      if (spec.chrome.title !== undefined && !isString(spec.chrome.title)) fail("chrome.title: must be a string");
+      if (spec.chrome.subtitle !== undefined && !isString(spec.chrome.subtitle)) fail("chrome.subtitle: must be a string");
+    }
+  }
+
+  if (spec.palette !== undefined && spec.palette !== "petrol" && spec.palette !== "paper") {
+    fail(`palette: must be "petrol" or "paper", got ${JSON.stringify(spec.palette)}`);
+  }
+
+  if (spec.window === undefined) {
+    fail("window: required [start, end]");
+  } else {
+    checkWindow(spec.window, "window", { allowRelative: false });
+  }
+
+  if (!isNumber(spec.revealSeconds) || spec.revealSeconds <= 0) fail("revealSeconds: required positive number");
+  if (!isNumber(spec.holdSeconds) || spec.holdSeconds <= 0) fail("holdSeconds: required positive number");
 }
 
 function validateLineSpec(spec, file) {
@@ -211,6 +254,17 @@ function validateLineSpec(spec, file) {
 
   if (spec.waypointBelowDot !== undefined && !isWaypointToken(spec.waypointBelowDot)) {
     fail(`waypointBelowDot: "${spec.waypointBelowDot}" is not a valid waypoint token`);
+  }
+
+  for (const field of ["waypointHideDate", "waypointBesideDot"]) {
+    if (spec[field] === undefined) continue;
+    if (!Array.isArray(spec[field])) {
+      fail(`${field}: must be an array of waypoint tokens`);
+    } else {
+      spec[field].forEach((tok, i) => {
+        if (!isWaypointToken(tok)) fail(`${field}[${i}]: "${tok}" is not a valid waypoint token`);
+      });
+    }
   }
 
   if (spec.displayDecimals !== undefined && !isNumber(spec.displayDecimals)) {

@@ -7,7 +7,7 @@ import registry from "../../data/series.json";
 import { Unit } from "../engine/format";
 
 export type SeriesMeta = {
-  source: "fred" | "derived";
+  source: "fred" | "derived" | "bls" | "bls_scrape";
   units: Unit;
   decimals: number;
   title: string;

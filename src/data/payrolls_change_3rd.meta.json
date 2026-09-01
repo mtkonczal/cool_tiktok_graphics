@@ -1,0 +1,13 @@
+{
+  "name": "payrolls_change_3rd",
+  "source": "bls_scrape",
+  "fetched_at": "2026-09-01T20:22:22Z",
+  "units": "count",
+  "decimals": 0,
+  "row_count": 571,
+  "first_date": "1979-01-01",
+  "last_date": "2026-05-01",
+  "last_value": 63,
+  "bls_scrape_field": "sa_3rd",
+  "bls_scrape_csv": "jobs-day/data/bls_ces_monthly_revisions.csv"
+}

@@ -44,6 +44,13 @@ to actually do something.
   different numbers than the vintage a published video actually showed. The
   meta sidecar is that vintage record. `.claude/` is gitignored (local
   per-machine state); this file is not.
+- **`out/` nests by data-release folder.** `make.sh`'s `dated_out_path`
+  derives the output path from the spec file's own location: a spec in a
+  `specs/<release>/` subfolder (e.g. `specs/jobs-day/foo.json`) renders into
+  the matching `out/<release>/` subfolder; a top-level spec (`specs/foo.json`)
+  still renders flat into `out/`, unchanged. This falls out of where the
+  spec file lives, not a per-spec setting -- a new `specs/<release>/` folder
+  for a future data release gets its own `out/<release>/` for free.
 - **`git mv` for every file relocation**, so history follows the file. For a
   case-only rename specifically (macOS is case-insensitive, GitHub/Linux
   CI are not), do it in two commits: `git mv foo.ts tmp && git mv tmp Foo.ts`
@@ -236,8 +243,21 @@ Example, the real `prime-epop-zoomout.json` average line:
 
 ## 7. Waypoint resolvers (`src/engine/waypoints.ts`)
 
-`waypoints` (single-series specs only) is a list of tokens, each either
-`"min"`, `"max"`, `"latest"`, or a literal `"YYYY-MM-DD"` date.
+`waypoints` (single-series specs only) is a list of tokens, each `"min"`,
+`"max"`, `"latest"`, a relative offset like `"-1m"`/`"-2m"`, or a literal
+`"YYYY-MM-DD"` date.
+
+**Relative tokens** (`"-Nm"`/`"+Nm"`, N months from `"latest"`) are for "the
+last N months" as their own self-correcting waypoints, without hardcoding
+dates that go stale — e.g. `["min", "max", "-2m", "-1m", "latest"]` labels
+the historical extremes plus the last three prints, and rolls forward on
+its own as new months arrive. Same `"-Nm"`/`"+Nm"` syntax a shot's own
+window already used (Section 5) — not a second grammar, just extended to
+waypoint tokens too (`resolveIndex` in `engine/waypoints.ts`). A tight
+cluster of these (several months close together, especially near a
+peak/trough waypoint) leans on the row-stagger logic described below —
+it's designed for exactly this, but is still tuned by eye per spec; render
+and look (Section 11) before trusting a new cluster of waypoints.
 
 **`min`/`max`/`latest` resolve against `spec.window`** — the full context
 the video ever shows, not whatever's currently on screen mid-zoom. This
@@ -268,6 +288,17 @@ below the dot instead of above — for the one-off case where an above-dot
 label would extend back through the line itself (e.g. a "latest" point
 sitting just right of, and below, a recent peak).
 
+**Collision handling among several waypoint labels** (`LineBody.tsx`) is a
+greedy first-fit: each label takes the lowest of up to 4 stacked rows
+(70px apart) that doesn't overlap an already-placed label, checked against
+every previously-placed one — not just its immediate neighbor, which only
+ever separates one colliding pair at a time and leaves a third or fourth
+label in the same crowded stretch overlapping again. A label pushed off
+its natural spot (row > 0) gets a thin leader line down to its own dot, so
+it still reads as "this label belongs to that point" instead of floating.
+This only engages when labels are close enough to actually collide —
+sparse waypoints (the common case) render exactly as before.
+
 ## 8. The visual system (`src/theme.ts`)
 
 - **Palettes**: `PETROL` (dark, default) and `PAPER` (light). Every color
@@ -294,6 +325,21 @@ sitting just right of, and below, a recent peak).
   sharing a neighborhood with a caption block that expands upward when
   tapped. This is a time-axis-only convention — a bar chart or distribution
   keeps its x-axis at the bottom, where a top axis would read as a bug.
+  "Time-axis" means whatever the x categories actually are: `BarVideo`'s
+  grouped bars are months, so it uses the same above-the-plot convention as
+  `LineBody` for the identical reason (nothing pushes those labels toward a
+  caption block); a bar chart whose x isn't time (states, industries, a
+  histogram's bins) is the case this bullet's "at the bottom" exception is
+  for.
+- **`LineBody`'s x-axis tick density is graduated by how much time is on
+  screen** (`engine/scales.ts`'s `xAxisTicks`), not fixed at "one tick per
+  January": under ~2.5 years visible, ticks are per-calendar-month instead
+  (spaced out — every month, every 2nd/3rd/6th — to stay at roughly 8 or
+  fewer), each labelled with just the month name except where the year
+  rolls over. Above that, it's the original sparse-year behavior
+  (`yearStep`-thinned Januaries) unchanged — a multi-decade zoomed-out shot
+  (`prime-epop-zoomout.json`) still reads `'95 '00 '05...`, not a wall of
+  month ticks.
 
 ## 9. Commands
 
@@ -311,6 +357,7 @@ node scripts/validate-spec.mjs specs/unrate-reveal.json
 
 # Render
 ./make.sh specs/unrate-reveal.json                              # one LineVideo spec -> out/YYYY-MM-DD-<id>.mp4
+./make.sh specs/jobs-day/unemployment-rate.json                  # a spec in a specs/<release>/ subfolder -> out/<release>/YYYY-MM-DD-<id>.mp4
 ./make.sh specs/some-sequence.json                               # a "type": "sequence" spec -> one stitched mp4
 ./make.sh src/data/cards_full_employment_reasons.json out/prefix # every rip-card / list-reveal step in a cards file
 
@@ -399,3 +446,79 @@ is broken.
   spec grammar that can become anything stops being a spec grammar.
 - **A published spec is frozen** (Section 2) — don't edit
   `specs/*.json` for a video that's already been posted. Write a new one.
+
+## 12. Bar charts (`BarVideo`)
+
+The bespoke-`.tsx`-escape-hatch Section 11 mentions, exercised for real: a
+grouped bar chart (e.g. a month's 1st/2nd/3rd BLS payroll estimate side by
+side) is not a line, and `LineBody` doesn't bend into drawing one. `BarVideo`
+(`src/compositions/BarVideo.tsx`) + `BarBody` (`src/bodies/BarBody.tsx`) are
+a second, much smaller composition living alongside `LineVideo`/`LineBody`
+— same `ChartChrome`, same `theme.ts` geometry (`PLOT`/`ROW`/`TEXTSAFE`), but
+a categorical x-axis (one tick per period) instead of a continuous date
+scale, so it does not reuse `engine/scales.ts`'s `px()`/`pathD()` — those are
+line-specific.
+
+A bar spec:
+
+```jsonc
+{
+  "id": "jobs-day-payrolls",
+  "type": "bar",                          // required -- this is what make.sh/Root.tsx/the validator switch on
+  "chrome": { "title": "...", "subtitle": "..." },  // optional, falls back to the first series' registry meta
+  "palette": "paper",                      // optional, same "petrol"/"paper" choice as LineSpec
+  "series": [                              // required, 2-3 entries -- one bar per entry, per period
+    { "ref": "payrolls_change_1st", "label": "1st estimate" },
+    { "ref": "payrolls_change_2nd", "label": "2nd estimate" },
+    { "ref": "payrolls_change_3rd", "label": "3rd estimate" }
+  ],
+  "window": ["2026-03-01", "latest"],      // required [start, end], literal dates or "latest" -- NO relative tokens
+  "revealSeconds": 4.0,                    // required -- total time to sweep every group in, left to right
+  "holdSeconds": 5.5                       // required -- hold time after the sweep finishes
+}
+```
+
+**Deliberately a much smaller grammar than `LineSpec`** — one reveal (group
+by group, left to right, each group's own bars growing from the zero line),
+then a hold. No shots array, no waypoints, no annotations. Add surface here
+only when a real bar-chart video needs it, not preemptively to mirror
+`LineSpec`.
+
+**No relative window tokens.** A `BarSpec`'s `window` *is* what's on screen
+— there's no separate zoomed/panned view the way a line spec's shots can
+diverge from `spec.window`, so `"−Nm"` tokens aren't supported; both bounds
+must be a literal `"YYYY-MM-DD"` or `"latest"`.
+
+**A `null` value for one series in one period just omits that bar** — the
+same "gap in the data is a gap on screen" rule Section 11 states for lines,
+applied to bars: a month whose 2nd estimate hasn't been published yet draws
+a 1st-estimate bar and nothing else in that slot, not a zero-height bar
+(which would be indistinguishable from an actual zero).
+
+**Bar-count vs. window width is a real tradeoff, tuned by eye, not by
+formula.** `BarBody` fits `n` month-groups (from `window`) into the fixed
+`PLOT.left`–`PLOT.right` span; each group's cluster then splits three ways
+for the bars, and value labels sit directly above/below each bar. 5 months of groups is the confirmed max on a 1080px-wide frame with
+3 bars/group and 3-digit values — 6 and 7 were both tried (down to a
+smaller font than the 5-month version uses) and still left two labels
+touching within a group. Found by rendering and looking at an actual frame
+(Section 11's hard rule), not by calculation.
+`monthGroupsFromSeries`'s caller (a spec's `window`) is what controls this,
+so keeping a bar spec's window short is the fix, not a code change.
+
+**A third categorical color.** `theme.ts`'s `Palette` type gained
+`seriesAlt` for this — `series/accent` are only two colors, and a grouped
+bar with 3 series needs a third. mikekonczal.com's stylesheet has no third
+token to lift (checked directly), so `seriesAlt` is a documented derivation
+using the same method as `series`/`accent`: a fixed hue distinct from both
+existing colors, HLS-lightened/darkened per palette, searched for a
+contrast ratio matching that palette's other two colors on their own
+background. See the comment above `PETROL`/`PAPER` in `theme.ts` for the
+exact numbers.
+
+**Wiring, if you add a third composition later**: a `"type"` field is what
+`make.sh`'s `render_spec` and `scripts/validate-spec.mjs`'s `main()` switch
+on (`"sequence"` / `"bar"` / anything else falls through to the `LineSpec`
+validator) — a spec with no `"type"` at all is still assumed to be a
+`LineSpec`, unchanged from before `BarVideo` existed. The composition itself
+still needs registering in `src/Root.tsx` the normal Remotion way.

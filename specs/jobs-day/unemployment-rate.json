@@ -1,0 +1,14 @@
+{
+  "id": "jobs-day-unrate",
+  "series": [{ "ref": "unrate_bls" }],
+  "window": ["2024-09-01", "latest"],
+  "waypoints": ["min", "max", "-2m", "-1m", "latest"],
+  "waypointAnchor": "point",
+  "waypointHideDate": ["min", "max", "-2m", "-1m"],
+  "waypointBesideDot": ["-2m", "-1m", "latest"],
+  "displayDecimals": 2,
+  "shots": [
+    { "kind": "draw", "seconds": 3.0 },
+    { "kind": "hold", "seconds": 6 }
+  ]
+}

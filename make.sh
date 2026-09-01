@@ -16,7 +16,10 @@
 # out/YYYY-MM-DD-<id>.mp4 -- the date is when this ran, not a data date, so
 # re-rendering the same spec next month after a fetch --refresh produces a
 # new dated file instead of silently overwriting the one you might have
-# already posted.
+# already posted. A spec living in a release subfolder of specs/ (e.g.
+# specs/jobs-day/foo.json) renders into the matching out/ subfolder instead
+# (out/jobs-day/YYYY-MM-DD-foo.mp4) -- see dated_out_path. A top-level spec
+# (specs/foo.json) still renders flat into out/, unchanged.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,19 +82,33 @@ check_freshness() {
 
 # ── single-spec / sequence rendering ──────────────────────────────────────
 
+# Nests under out/<release>/ when spec_file lives in a release subfolder of
+# specs/ (specs/jobs-day/foo.json -> out/jobs-day/...), so each data-release
+# day's videos land grouped together instead of flat alongside every other
+# spec's output; a top-level spec (specs/foo.json) stays flat in out/,
+# unchanged. Derived from the spec's own path, not a per-spec setting, so a
+# new specs/<release>/ folder gets this for free.
 dated_out_path() {
   local id="$1"
-  echo "out/$(date +%Y-%m-%d)-${id}.mp4"
+  local spec_file="$2"
+  local rel_dir
+  rel_dir="$(dirname "$spec_file")"
+  if [[ "$rel_dir" == specs/* ]]; then
+    echo "out/${rel_dir#specs/}/$(date +%Y-%m-%d)-${id}.mp4"
+  else
+    echo "out/$(date +%Y-%m-%d)-${id}.mp4"
+  fi
 }
 
 render_spec() {
   local spec_file="$1"
-  local id out
+  local id out composition
   id=$(jq -r '.id' "$spec_file")
-  out=$(dated_out_path "$id")
-  mkdir -p out
-  echo "Rendering ${id} -> ${out}"
-  npx remotion render src/index.ts LineVideo "$out" --props="$spec_file"
+  out=$(dated_out_path "$id" "$spec_file")
+  composition=$([[ "$(jq -r '.type // empty' "$spec_file")" == "bar" ]] && echo "BarVideo" || echo "LineVideo")
+  mkdir -p "$(dirname "$out")"
+  echo "Rendering ${id} (${composition}) -> ${out}"
+  npx remotion render src/index.ts "$composition" "$out" --props="$spec_file"
 }
 
 render_sequence() {
@@ -123,8 +140,8 @@ render_sequence() {
     echo "file '$clip'" >>"$concat_list"
   done
 
-  mkdir -p out
-  out=$(dated_out_path "$id")
+  out=$(dated_out_path "$id" "$seq_file")
+  mkdir -p "$(dirname "$out")"
   echo "Stitching ${n} clips -> ${out}"
   ffmpeg -y -v error -f concat -safe 0 -i "$concat_list" -c copy "$out"
   rm -rf "$tmp"

@@ -1,0 +1,15 @@
+{
+  "id": "jobs-day-total-employment",
+  "series": [{ "ref": "payrolls_change" }],
+  "chrome": {
+    "title": "Total employment",
+    "subtitle": "Monthly change in total nonfarm payrolls"
+  },
+  "window": ["2024-01-01", "latest"],
+  "waypoints": ["latest"],
+  "displayDecimals": 0,
+  "shots": [
+    { "kind": "draw", "seconds": 3.0 },
+    { "kind": "hold", "seconds": 10.0 }
+  ]
+}

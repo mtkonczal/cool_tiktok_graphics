@@ -43,6 +43,21 @@ export type LineSpec = {
   /** The one waypoint (by token) that should render below its dot instead
    * of above -- see belowDotOverride in engine/waypoints.ts. */
   waypointBelowDot?: WaypointToken;
+  /** Waypoints (by token) whose label drops the date line entirely --
+   * value only. Everything not listed keeps its date (unchanged default
+   * behavior). See Waypoint.dateStyle in engine/waypoints.ts. */
+  waypointHideDate?: WaypointToken[];
+  /** Waypoints (by token) whose label anchors beside its own dot (at the
+   * point's own height) instead of the usual headroom-based position above
+   * it -- a tight trailing readout next to the line, e.g. for "the last
+   * three months" sitting close together near the current end of a line.
+   * Combines with `waypointHideDate`: still-has-a-date + beside-dot reads
+   * as value-then-date on one line (See Waypoint.dateStyle: "inline");
+   * hidden-date + beside-dot is value alone, still beside the dot ("none").
+   * Not in this list keeps the original above-the-dot position, unaffected
+   * by `waypointHideDate` either way (still just loses its date line if
+   * hidden -- see Waypoint.dateStyle: "none" without besideDot). */
+  waypointBesideDot?: WaypointToken[];
   /** Overrides the registry's storage decimals for on-screen labels (e.g.
    * unrate is stored at 4 decimals for vintage precision but shown at 1). */
   displayDecimals?: number;
@@ -103,6 +118,18 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
         resolveIndex(primaryData, token, { i0: outerWinStart, i1: outerWinEnd })
       );
       waypoints = makeWaypoints(primaryData, idxs, state.calloutBase, primaryMeta.units, decimals, anchor);
+
+      if (spec.waypointHideDate || spec.waypointBesideDot) {
+        const hideDateSet = new Set(spec.waypointHideDate ?? []);
+        const besideDotSet = new Set(spec.waypointBesideDot ?? []);
+        waypoints = waypoints.map((wp, i) => {
+          const token = spec.waypoints![i];
+          const showDate = !hideDateSet.has(token);
+          const besideDot = besideDotSet.has(token);
+          const dateStyle = besideDot ? (showDate ? "inline" : "none") : showDate ? "stacked" : "none";
+          return { ...wp, dateStyle, besideDot };
+        });
+      }
 
       if (spec.waypointFade) {
         const fadeIdx = resolveIndex(primaryData, spec.waypointFade.token, { i0: outerWinStart, i1: outerWinEnd });

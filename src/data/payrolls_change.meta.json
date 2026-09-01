@@ -1,0 +1,15 @@
+{
+  "name": "payrolls_change",
+  "source": "bls",
+  "fetched_at": "2026-09-01T20:22:32Z",
+  "units": "count",
+  "decimals": 0,
+  "row_count": 199,
+  "first_date": "2010-01-01",
+  "last_date": "2026-07-01",
+  "last_value": -23,
+  "bls_ids": [
+    "CES0000000001"
+  ],
+  "expr": "CES0000000001 - dplyr::lag(CES0000000001, 1)"
+}

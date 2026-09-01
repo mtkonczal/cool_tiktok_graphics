@@ -6,12 +6,11 @@ import {
   chooseYStep,
   ease,
   haFor,
-  monthDate,
   pathD,
   px,
   py,
   svgAnchor,
-  yearStep,
+  xAxisTicks,
 } from "../engine/scales";
 import { Unit, fmtAxis } from "../engine/format";
 import { Waypoint } from "../engine/waypoints";
@@ -88,12 +87,7 @@ export const LineBody: React.FC<{
 
   const iLo = Math.max(0, Math.ceil(xDomain[0]));
   const iHi = Math.min(primary.length - 1, Math.floor(xDomain[1]));
-  const step = yearStep(xDomain);
-  const janIdxs: number[] = [];
-  for (let i = iLo; i <= iHi; i++) {
-    const md = monthDate(primary[i].date);
-    if (md.month === 1 && md.year % step === 0) janIdxs.push(i);
-  }
+  const xTicks = xAxisTicks(primary, iLo, iHi);
 
   const lastIdx = primary.length - 1;
   const atLatest = tipExact >= lastIdx - 1e-9;
@@ -124,27 +118,33 @@ export const LineBody: React.FC<{
       {/* x-axis, ABOVE the plot: rule + ticks bind the year labels to the plot
           so they read as an axis rather than as a subtitle under the title. */}
       <line x1={PLOT.left} y1={ROW.xaxisRule} x2={PLOT.right} y2={ROW.xaxisRule} stroke={palette.grid} strokeWidth={STROKE.grid} />
-      {janIdxs.map((i) => (
-        <React.Fragment key={`x-${i}`}>
+      {xTicks.map(({ idx, lines }) => (
+        <React.Fragment key={`x-${idx}`}>
           <line
-            x1={px(i, xDomain)}
+            x1={px(idx, xDomain)}
             y1={ROW.xaxisRule}
-            x2={px(i, xDomain)}
+            x2={px(idx, xDomain)}
             y2={ROW.xaxisRule + ROW.xaxisTick}
             stroke={palette.grid}
             strokeWidth={STROKE.tick}
           />
-          <text
-            x={px(i, xDomain)}
-            y={ROW.xaxisLabel}
-            fontSize={TYPE.axis.size}
-            fontFamily={TYPE.axis.family}
-            fontWeight={TYPE.axis.weight}
-            fill={palette.dim}
-            textAnchor="middle"
-          >
-            {`’${String(monthDate(primary[i].date).year).slice(2)}`}
-          </text>
+          {/* Multi-line ticks (month + year) stack upward from the same
+              baseline a single-line tick (bare year) would sit at, so every
+              tick's bottom line lines up regardless of how many lines it has. */}
+          {lines.map((line, li) => (
+            <text
+              key={li}
+              x={px(idx, xDomain)}
+              y={ROW.xaxisLabel - (lines.length - 1 - li) * ROW.xaxisLabelLineHeight}
+              fontSize={TYPE.axis.size}
+              fontFamily={TYPE.axis.family}
+              fontWeight={TYPE.axis.weight}
+              fill={palette.dim}
+              textAnchor="middle"
+            >
+              {line}
+            </text>
+          ))}
         </React.Fragment>
       ))}
     </>
@@ -331,21 +331,58 @@ export const LineBody: React.FC<{
           // every frame, so it unwinds on its own as the view zooms back in.
           const ROW_STAGGER = 70;
           const EDGE_PAD = 16;
-          const VERT_PAD = 12;
+          // Was 12 -- too tight to catch two "point"-anchor labels whose
+          // calloutYValue/calloutYDate happen to land a real line-height
+          // apart in data space but read as touching on screen, since top/
+          // bottom above are text BASELINES, not full glyph boxes (no room
+          // for the value line's own height). ~48, close to TYPE.value.size,
+          // is the minimum gap that actually clears one line of text --
+          // found by rendering unrate_bls with 3 closely-spaced recent-month
+          // waypoints, where 12 let "Jun 2026"/"4.19%" collide into the
+          // point above it.
+          const VERT_PAD = 48;
+          const INLINE_GAP = 14; // gap between value and date text in "inline" dateStyle
+          const BESIDE_LIFT = 14; // small lift off the dot's own height for "besideDot", so text clears the line stroke
+          // Horizontal clearance from the dot for "besideDot" labels -- without
+          // it, an "end"-anchored label's edge lands exactly at cx, the same x
+          // the dot itself is centered on, so the two visibly touch/overlap
+          // (found by rendering unrate_bls's "latest" point, inline mode, right
+          // at the dot). Not needed for the "above" (headroom) position -- that
+          // one is already far enough above the dot vertically.
+          const DOT_PAD = MARK.waypoint / zoomFactor + 8;
           const dateFontPx = TYPE.date.size / textZoom;
+          const valueFontPx = TYPE.value.size / textZoom;
           const laidOut = visible.map((wp) => {
             const cx = px(wp.idx, xDomain);
             const anchor = svgAnchor(haFor(wp.idx, xDomain));
-            const w = wp.dateLabel.length * dateFontPx * 0.56; // date label is the wider of the pair
-            const left = anchor === "start" ? cx : anchor === "end" ? cx - w : cx - w / 2;
-            const right = anchor === "start" ? cx + w : anchor === "end" ? cx : cx + w / 2;
-            // Date line sits above the value line (calloutYDate > calloutYValue
-            // in data space, which is a smaller/higher pixel y) for both anchor
-            // modes -- "max" puts every waypoint's pair at the same two rows,
-            // "point" puts each pair at its own point's height.
-            const top = py(wp.calloutYDate, yDomain);
-            const bottom = py(wp.calloutYValue, yDomain);
-            return { wp, cx, anchor, left, right, top, bottom };
+            const dateStyle = wp.dateStyle ?? "stacked";
+            const valueW = wp.valueLabel.length * valueFontPx * 0.56;
+            const dateW = wp.dateLabel.length * dateFontPx * 0.56;
+            let w: number, top: number, bottom: number, rowY: number, labelCx: number;
+            if (dateStyle === "stacked") {
+              // Date line sits above the value line (calloutYDate > calloutYValue
+              // in data space, which is a smaller/higher pixel y) for both anchor
+              // modes -- "max" puts every waypoint's pair at the same two rows,
+              // "point" puts each pair at its own point's height.
+              w = dateW; // date label is the wider of the pair
+              top = py(wp.calloutYDate, yDomain);
+              bottom = py(wp.calloutYValue, yDomain);
+              rowY = bottom;
+              labelCx = cx;
+            } else {
+              // One line only -- either beside the dot (its own height, minus a
+              // small lift so text clears the line stroke) or above it at the
+              // usual headroom-based spot (same place "stacked" mode's value
+              // line would've sat, just with no date line above it).
+              rowY = wp.besideDot ? py(wp.val, yDomain) - BESIDE_LIFT : py(wp.calloutYValue, yDomain);
+              w = dateStyle === "inline" ? valueW + INLINE_GAP + dateW : valueW;
+              top = rowY - valueFontPx * 0.55;
+              bottom = rowY + valueFontPx * 0.55;
+              labelCx = wp.besideDot ? (anchor === "end" ? cx - DOT_PAD : anchor === "start" ? cx + DOT_PAD : cx) : cx;
+            }
+            const left = anchor === "start" ? labelCx : anchor === "end" ? labelCx - w : labelCx - w / 2;
+            const right = anchor === "start" ? labelCx + w : anchor === "end" ? labelCx : labelCx + w / 2;
+            return { wp, cx, labelCx, anchor, left, right, top, bottom, dateStyle, valueW, dateW, rowY };
           });
           // Two labels only compete for a row if they'd actually overlap on
           // screen -- horizontally close AND vertically close. With every
@@ -373,62 +410,173 @@ export const LineBody: React.FC<{
               if (cur.anchor === "middle") {
                 const w = cur.right - cur.left;
                 cur.anchor = "end";
-                cur.left = cur.cx - w;
-                cur.right = cur.cx;
+                cur.left = cur.labelCx - w;
+                cur.right = cur.labelCx;
               } else if (nxt.anchor === "middle") {
                 const w = nxt.right - nxt.left;
                 nxt.anchor = "start";
-                nxt.left = nxt.cx;
-                nxt.right = nxt.cx + w;
+                nxt.left = nxt.labelCx;
+                nxt.right = nxt.labelCx + w;
               }
             }
           }
 
           // Assigned right-to-left, pinning the rightmost (almost always the
-          // latest/"now" point) at row 0 -- it never moves. A collision instead
-          // bumps the OLDER of the pair up to row 1, so "now" stays at the same
-          // level the whole time and older callouts cede the row instead.
+          // latest/"now" point) at row 0 -- it never moves. Greedy first-fit
+          // against every ALREADY-placed label (not just the immediate
+          // neighbor), checked at that label's own already-resolved
+          // row-shifted position -- a simple alternating 0/1 scheme only
+          // ever separates one pair at a time, so 3+ labels that all crowd
+          // the same stretch (e.g. a "last three months" trio sitting near
+          // a recent peak) run out of rows and collide again past the
+          // second one. Capped at 4 rows -- if a spec ever piles up more
+          // than that in one stretch, the fix is fewer/sparser waypoints,
+          // not a taller stack.
+          const MAX_ROWS = 4;
+          const placed: { entry: (typeof laidOut)[number]; row: number }[] = [];
           const rows = new Array(laidOut.length).fill(0);
-          let nextEntry: (typeof laidOut)[number] | null = null;
-          let nextRow = 0;
           for (let i = laidOut.length - 1; i >= 0; i--) {
             const entry = laidOut[i];
-            const row = nextEntry !== null && collides(entry, nextEntry) ? 1 - nextRow : 0;
+            let row = 0;
+            for (; row < MAX_ROWS - 1; row++) {
+              const offset = row * ROW_STAGGER;
+              const top = entry.top - offset;
+              const bottom = entry.bottom - offset;
+              const conflict = placed.some(({ entry: other, row: otherRow }) => {
+                const oOffset = otherRow * ROW_STAGGER;
+                const oTop = other.top - oOffset;
+                const oBottom = other.bottom - oOffset;
+                return (
+                  entry.right > other.left - EDGE_PAD &&
+                  other.right > entry.left - EDGE_PAD &&
+                  top < oBottom + VERT_PAD &&
+                  oTop < bottom + VERT_PAD
+                );
+              });
+              if (!conflict) break;
+            }
             rows[i] = row;
-            nextRow = row;
-            nextEntry = entry;
+            placed.push({ entry, row });
           }
 
-          return laidOut.map(({ wp, cx, anchor }, i) => {
+          return laidOut.map((entry, i) => {
+            const { wp, cx, labelCx, anchor, dateStyle, valueW, dateW, rowY } = entry;
             const cy = py(wp.val, yDomain);
             const isLatest = wp.idx === lastIdx;
             const rowOffset = rows[i] * ROW_STAGGER;
-            return (
-              <g key={`wp-${wp.idx}`} opacity={wp.opacity ?? 1}>
-                <circle cx={cx} cy={cy} r={MARK.waypoint / zoomFactor} fill={isLatest ? palette.accent : palette.series} />
-                <circle cx={cx} cy={cy} r={MARK.waypointCore / zoomFactor} fill={palette.bg} />
+            const valueColor = isLatest ? palette.accent : palette.text;
+            const leaderTargetY = (dateStyle === "stacked" ? py(wp.calloutYValue, yDomain) : rowY) - rowOffset + TYPE.value.size * 0.3;
+
+            let labelNodes: React.ReactNode;
+            if (dateStyle === "stacked") {
+              labelNodes = (
+                <>
+                  <text
+                    x={cx}
+                    y={py(wp.calloutYDate, yDomain) - rowOffset}
+                    fontSize={TYPE.date.size / textZoom}
+                    fontFamily={TYPE.date.family}
+                    fontWeight={TYPE.date.weight}
+                    fill={palette.dim}
+                    textAnchor={anchor}
+                  >
+                    {wp.dateLabel}
+                  </text>
+                  <text
+                    x={cx}
+                    y={py(wp.calloutYValue, yDomain) - rowOffset}
+                    fontSize={TYPE.value.size / textZoom}
+                    fontFamily={TYPE.value.family}
+                    fontWeight={TYPE.value.weight}
+                    fill={valueColor}
+                    textAnchor={anchor}
+                  >
+                    {wp.valueLabel}
+                  </text>
+                </>
+              );
+            } else if (dateStyle === "inline") {
+              // Value then date, in that reading order, whichever direction
+              // the anchor extends -- "end" ends the whole pair at the dot
+              // (so the date, being second, sits right next to it and the
+              // value trails further away); "start"/"middle" build the pair
+              // left to right from the dot instead.
+              let valueX = labelCx,
+                valueAnchor = anchor,
+                dateX = labelCx,
+                dateAnchor = anchor;
+              if (anchor === "end") {
+                dateX = labelCx;
+                dateAnchor = "end";
+                valueX = labelCx - dateW - INLINE_GAP;
+                valueAnchor = "end";
+              } else if (anchor === "start") {
+                valueX = labelCx;
+                valueAnchor = "start";
+                dateX = labelCx + valueW + INLINE_GAP;
+                dateAnchor = "start";
+              } else {
+                const total = valueW + INLINE_GAP + dateW;
+                valueX = labelCx - total / 2;
+                valueAnchor = "start";
+                dateX = valueX + valueW + INLINE_GAP;
+                dateAnchor = "start";
+              }
+              const rowYAdj = rowY - rowOffset;
+              labelNodes = (
+                <>
+                  <text
+                    x={valueX}
+                    y={rowYAdj}
+                    fontSize={TYPE.value.size / textZoom}
+                    fontFamily={TYPE.value.family}
+                    fontWeight={TYPE.value.weight}
+                    fill={valueColor}
+                    textAnchor={valueAnchor}
+                  >
+                    {wp.valueLabel}
+                  </text>
+                  <text
+                    x={dateX}
+                    y={rowYAdj}
+                    fontSize={TYPE.date.size / textZoom}
+                    fontFamily={TYPE.date.family}
+                    fontWeight={TYPE.date.weight}
+                    fill={palette.dim}
+                    textAnchor={dateAnchor}
+                  >
+                    {wp.dateLabel}
+                  </text>
+                </>
+              );
+            } else {
+              labelNodes = (
                 <text
-                  x={cx}
-                  y={py(wp.calloutYDate, yDomain) - rowOffset}
-                  fontSize={TYPE.date.size / textZoom}
-                  fontFamily={TYPE.date.family}
-                  fontWeight={TYPE.date.weight}
-                  fill={palette.dim}
-                  textAnchor={anchor}
-                >
-                  {wp.dateLabel}
-                </text>
-                <text
-                  x={cx}
-                  y={py(wp.calloutYValue, yDomain) - rowOffset}
+                  x={labelCx}
+                  y={rowY - rowOffset}
                   fontSize={TYPE.value.size / textZoom}
                   fontFamily={TYPE.value.family}
                   fontWeight={TYPE.value.weight}
-                  fill={isLatest ? palette.accent : palette.text}
+                  fill={valueColor}
                   textAnchor={anchor}
                 >
                   {wp.valueLabel}
                 </text>
+              );
+            }
+
+            return (
+              <g key={`wp-${wp.idx}`} opacity={wp.opacity ?? 1}>
+                {/* A label bumped a row or more away from its natural spot
+                    (crowded off it by a neighbor) otherwise floats with no
+                    visual tie back to its own dot -- a thin leader closes
+                    that gap, same idea as a "point" annotation's leader. */}
+                {rowOffset > 0 && (
+                  <line x1={cx} y1={cy} x2={cx} y2={leaderTargetY} stroke={palette.dim} strokeWidth={STROKE.tick} />
+                )}
+                <circle cx={cx} cy={cy} r={MARK.waypoint / zoomFactor} fill={isLatest ? palette.accent : palette.series} />
+                <circle cx={cx} cy={cy} r={MARK.waypointCore / zoomFactor} fill={palette.bg} />
+                {labelNodes}
               </g>
             );
           });

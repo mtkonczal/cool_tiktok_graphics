@@ -1,6 +1,7 @@
 import React from "react";
 import { Composition } from "remotion";
 import { LineVideo, LineSpec, calculateLineMetadata } from "./compositions/LineVideo";
+import { BarVideo, BarSpec, calculateBarMetadata } from "./compositions/BarVideo";
 import { RipCardReveal, calculateRipCardMetadata } from "./RipCardReveal";
 import { ListReveal, TOTAL_FRAMES as LIST_TOTAL_FRAMES } from "./ListReveal";
 
@@ -23,6 +24,19 @@ const STUDIO_DEFAULT_SPEC: LineSpec = {
   ],
 };
 
+const STUDIO_DEFAULT_BAR_SPEC: BarSpec = {
+  id: "studio-default-bar",
+  type: "bar",
+  series: [
+    { ref: "payrolls_change_1st", label: "1st estimate" },
+    { ref: "payrolls_change_2nd", label: "2nd estimate" },
+    { ref: "payrolls_change_3rd", label: "3rd estimate" },
+  ],
+  window: ["2026-01-01", "latest"],
+  revealSeconds: 4,
+  holdSeconds: 5,
+};
+
 export const RemotionRoot: React.FC = () => {
   return (
     <>
@@ -35,6 +49,19 @@ export const RemotionRoot: React.FC = () => {
         component={LineVideo}
         calculateMetadata={calculateLineMetadata}
         defaultProps={STUDIO_DEFAULT_SPEC}
+        durationInFrames={30}
+        fps={FPS}
+        width={1080}
+        height={1920}
+      />
+      {/* One generic grouped-bar shape, reused for every bar video -- see
+          src/compositions/BarVideo.tsx. Same --props-at-render-time pattern
+          as LineVideo above. */}
+      <Composition
+        id="BarVideo"
+        component={BarVideo}
+        calculateMetadata={calculateBarMetadata}
+        defaultProps={STUDIO_DEFAULT_BAR_SPEC}
         durationInFrames={30}
         fps={FPS}
         width={1080}
