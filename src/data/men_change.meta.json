@@ -1,0 +1,16 @@
+{
+  "name": "men_change",
+  "source": "bls",
+  "fetched_at": "2026-09-02T14:13:07Z",
+  "units": "count",
+  "decimals": 0,
+  "row_count": 199,
+  "first_date": "2010-01-01",
+  "last_date": "2026-07-01",
+  "last_value": 9,
+  "bls_ids": [
+    "CES0000000001",
+    "CES0000000010"
+  ],
+  "expr": "(CES0000000001 - dplyr::lag(CES0000000001, 1)) - (CES0000000010 - dplyr::lag(CES0000000010, 1))"
+}

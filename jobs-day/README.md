@@ -1,7 +1,7 @@
 # jobs-day
 
-A monthly-reusable folder for the jobs-day TikTok suite: six videos across
-four standalone scripts, built from the same headline data that feeds
+A monthly-reusable folder for the jobs-day TikTok suite: nine videos across
+six standalone scripts, built from the same headline data that feeds
 `BLS-CPS-Jobs-Numbers/01_initial_tweet.R`. Most of it pulls directly from
 BLS rather than FRED (see "why BLS not FRED" below); the two prime-age
 videos are the exception, sourced from FRED since they're not part of that
@@ -27,13 +27,10 @@ direct-BLS-API path (see `run_prime_age.sh` below).
   `manufacturing_change`, render `manufacturing-employment-level.json`
   (`LineVideo`, drawn recent-then-zoomed-out to 1990) and
   `manufacturing-employment-change.json` (`BarVideo`, same series pattern
-  as `total-employment-change-bar.json`). No scrape step. **Not yet fetched
-  or rendered as of this writing** — see the note at the end of this file.
+  as `total-employment-change-bar.json`). No scrape step.
 - `run_gender_split.sh` — standalone: fetch `men_change`/`women_change`,
   render `gender-jobs-stacked.json` (`BarVideo`, 2-series **stacked** —
   the first spec in this repo to use `BarSpec.stacked`). No scrape step.
-  **Not yet fetched or rendered as of this writing** — see the note at the
-  end of this file.
 - `run_jobs_day.sh` — convenience wrapper: runs the six scripts above in
   sequence. Nothing in it isn't in one of the six; use it when you want
   everything, use one of the six directly when you don't. See "Are these
@@ -111,8 +108,8 @@ direct-BLS-API path (see `run_prime_age.sh` below).
   `manufacturing-employment-level.json` and `gender-jobs-stacked.json`
   below use short `chrome.title`s (`"Manufacturing jobs"` / `"Who gained
   jobs"`) specifically to avoid needing this same fix — chosen by length
-  comparison against the two titles that are already confirmed to fit, not
-  yet confirmed by rendering (see the note at the end of this file).
+  comparison against the two titles already confirmed to fit, and since
+  confirmed directly by rendering both specs (see the section below).
 - **`total-employment-change-bar.json`** (`BarVideo`) is a second rendering
   of `total-employment-change.json`'s exact series (`payrolls_change`) as a
   single-series bar chart instead of a line: one bar per month, colored by
@@ -241,14 +238,20 @@ same convention as `payrolls_change`.
    `LineVideo`) — manufacturing employment, `CES3000000001` (All Employees,
    Manufacturing) straight from the BLS API, drawn over 2015-latest then
    zoomed out to 1990-latest. Waypoints are `["max", "2019-12-01",
-   "latest"]` with `waypointAnchor: "point"` (a wide-range mix: the 1990-
-   latest historical max is almost certainly a late-1990s value far above
-   the pre-COVID and current levels) — the point being to let the zoomed-
-   out shot make the long secular-decline case (current employment well
-   below its `"max"` waypoint) alongside the 2015-latest short view. An
-   `hline` shows the 2024-2026 average once zoomed out, same pattern as
-   `prime-epop-zoomout.json`. Registered at `decimals: 1` (registry note)
-   so on-screen values read e.g. "12.9M" instead of flattening to "13M".
+   "latest"]` with `waypointAnchor: "point"`. Confirmed by rendering: the
+   1990-latest `"max"` actually lands at the window's own start (Feb 1990,
+   17.9M) — manufacturing employment has been on a near-monotonic secular
+   decline since well before 1990, so within this window the earliest point
+   *is* the highest one, not a later-1990s local peak as originally
+   assumed when this spec was written. That's still the right story to
+   tell (current employment far below where the window starts), just not
+   for the reason first guessed — worth knowing before moving the window's
+   start date, since `"max"` will keep tracking wherever that start lands.
+   Registered `data/series.json` at `start_year: 1990` (`fetch.R`'s
+   `"bls"`-source default is 2010, too short for this window — see the
+   section below) and `decimals: 1` so on-screen values read e.g. "12.9M"
+   instead of flattening to "13M". An `hline` shows the 2024-2026 average
+   once zoomed out, same pattern as `prime-epop-zoomout.json`.
 
 8. **`jobs-day-manufacturing-bar`** (`manufacturing-employment-change.json`,
    `BarVideo`) — `manufacturing_change` (CES3000000001 differenced month-
@@ -266,11 +269,13 @@ same convention as `payrolls_change`.
    why that distinction matters whenever one sex loses jobs in a given
    month). `men_change` + `women_change` reconstructs `payrolls_change`
    exactly every month, by construction. Each segment's value label sits at
-   its own vertical midpoint, colored `palette.bg` rather than
-   `palette.text` — the in-segment equivalent of this repo's usual outside-
-   the-bar label, chosen because every series/seriesAlt color here is
-   already tuned for high contrast against `bg` (see `butter_on_espresso.ts`),
-   and contrast is symmetric.
+   its own vertical midpoint, in `palette.text` with a `palette.bg` halo
+   stroke behind it, so it stays legible whether the label lands on its own
+   segment's fill or — a 3-4 digit value routinely doesn't fit a stacked
+   column's narrow (55%-of-slot) width — overflows onto the plot's own
+   background (see `BarBody.tsx`'s `stacked` prop comment for the bug this
+   replaced: a flat `palette.bg` fill went invisible wherever it
+   overflowed, dropping Feb's men's-jobs minus sign in early testing).
 
 ## Prerequisites
 
@@ -314,51 +319,50 @@ produces a new `src/data/*.json` file, that script will stop and tell you
 to add import lines to `src/data/registry.ts` (Remotion's bundler needs a
 literal static import graph, so this one step can't be scripted away — see
 CLAUDE.md Section 3). Add them, then re-run the same command. Every run
-after that is fully unattended. (The seven original jobs-day series,
-including `prime_epop`/`prime_lfpr`, are already registered as of this
-writing — this only bites again if `registry.ts` is reverted. The four
-newer series below — `manufacturing`, `manufacturing_change`, `men_change`,
-`women_change` — are NOT yet registered, so `run_manufacturing.sh` and
-`run_gender_split.sh` will hit this STOP block on their first run; that's
-expected, not a bug.)
+after that is fully unattended. All eleven series in this folder's videos,
+including `manufacturing`/`manufacturing_change`/`men_change`/
+`women_change`, are registered as of this writing — this only bites again
+if `registry.ts` is reverted.
 
-## Manufacturing and gender-split additions: not yet fetched or rendered
+## Manufacturing and gender-split additions: fetched, rendered, checked
 
 `run_manufacturing.sh`, `run_gender_split.sh`, their three specs
 (`manufacturing-employment-level.json`, `manufacturing-employment-change.json`,
 `gender-jobs-stacked.json`), the four new `data/series.json` entries, and
-`BarBody`'s new `stacked` prop were all written and validated
-(`node scripts/validate-spec.mjs`, plus a clean `tsc --noEmit`) without
-access to `Rscript`, a BLS-key-bearing environment, or `npx remotion
-render` — so none of the following has actually happened yet, and none of
-it should be assumed to work until it does:
+`BarBody`'s new `stacked` prop were written and validated in one session
+without access to `Rscript`, a BLS-key-bearing environment, or `npx
+remotion render`; a later session with access to all three finished the
+job -- fetched, rendered, and checked by eye (CLAUDE.md Section 11's hard
+rule). Two real bugs turned up only once actual frames existed to look at,
+neither catchable by `tsc` or the spec validator:
 
-- The BLS fetches (`Rscript data/fetch.R --refresh manufacturing
-  manufacturing_change men_change women_change`) have not run. The four
-  series' `expr` strings (R, evaluated by `data/fetch.R` via
-  `eval(parse(text = ...))`) have not been executed even once.
-- `src/data/registry.ts` has not been touched — both new scripts will stop
-  at their one-time STOP check on first run and print the exact import/map
-  lines to add (same mechanism every other series in this folder already
-  uses).
-- No video has been rendered. In particular, `gender-jobs-stacked.json`'s
-  stacked-bar geometry (`BarBody.tsx`'s new `stacked` branch: diverging
-  positive/negative stacking, `palette.bg`-colored in-segment labels, the
-  narrower single-column bar width) has never been checked by eye — only
-  by TypeScript compiling and the spec validator accepting the shape. The
-  in-segment label contrast and the "positive stacks up, negative stacks
-  down" layout are reasoned from this repo's documented palette-contrast
-  numbers and the existing per-bar reveal math, not confirmed by rendering.
-- `manufacturing-employment-level.json`'s and `gender-jobs-stacked.json`'s
-  short `chrome.title`s were chosen by comparing character counts against
-  `"Employment rate"`/`"EPOP vs. LFPR"` (already confirmed to fit under
-  `butter_on_espresso` — see the theme bullet above), not by rendering
-  these two specs themselves.
+- `manufacturing`/`manufacturing_change` used `data/fetch.R`'s default
+  `start_year` (2010) for a `"bls"`-source series, but
+  `manufacturing-employment-level.json`'s zoomed-out shot needs a window
+  back to 1990 -- the render failed outright (`resolveIndex: date
+  "1990-01-01" not found in series`) rather than silently mis-drawing.
+  Fixed by adding `"start_year": 1990` to both series' `data/series.json`
+  entries (same series ID, just a longer BLS API pull -- not a change to
+  what either series measures).
+- `gender-jobs-stacked.json`'s stacked segments render their value label at
+  their own vertical midpoint in `palette.bg`, for contrast against the
+  segment's own fill -- but a stacked column is only 55% of a group's slot
+  width, and a 3-4 digit value (plus a minus sign) routinely doesn't fit.
+  The overflowing part of the label carried the same `palette.bg` fill
+  straight onto the plot's near-identical dark background and vanished --
+  Feb's men's-jobs value (-129) rendered as "129", silently dropping the
+  sign. Fixed in `BarBody.tsx` by giving these labels a `palette.bg` halo
+  stroke behind a `palette.text` fill instead of a flat `palette.bg` fill:
+  on the segment, the dark stroke outlines the light fill for contrast;
+  off the segment, the stroke matches the page background and disappears,
+  leaving the light fill to contrast against that same background on its
+  own -- no overflow math needed, and it degrades the same way regardless
+  of which segment or how much of the label spills over.
 
-**To actually turn these into videos**: run `./jobs-day/run_manufacturing.sh`
-and `./jobs-day/run_gender_split.sh` from a terminal with `BLS_KEY` set
-(e.g. via Claude Code on this machine, where `Rscript`/`.Renviron` are
-available). Each will stop once with the registry.ts edit instructions;
-add those four lines, re-run, and check the rendered `.mp4`s in
-`out/jobs-day/` before posting — especially the stacked chart's layout and
-labels, and both new specs' titles against `TEXTSAFE`.
+Every other design choice in this addition -- the diverging stack (positive
+up, negative down, in series order), single-series legend suppression, the
+two new `chrome.title`s' fit under `butter_on_espresso` -- was confirmed
+against actual rendered frames, not just reasoned about. Re-render with
+`./jobs-day/run_manufacturing.sh` / `./jobs-day/run_gender_split.sh` before
+relying on this description again if either script's specs or `BarBody.tsx`
+change.

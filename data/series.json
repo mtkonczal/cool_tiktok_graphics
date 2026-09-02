@@ -119,5 +119,46 @@
     "title": "Total employment",
     "subtitle": "Monthly change in total nonfarm payrolls",
     "note": "Deliberately NOT the same number as `payrolls_change_1st`/`_2nd`/`_3rd`. Those are frozen at whichever estimate vintage they name, scraped from BLS's revisions table. This is CES0000000001 (total nonfarm employment level, SA) differenced month-over-month via the BLS API -- so every historical month here reflects however many rounds of revision have landed since, i.e. the CURRENT best-known change, the number a chart drawn today would headline. Matches the `ces = CES0000000001 - lag(CES0000000001, 1)` pattern in BLS-CPS-Jobs-Numbers/00_run_monthly.R and /02_unrate_jobs.R exactly. Pick this one for \"what's the picture right now\"; pick `payrolls_change_1st` for \"what did the headline say that month.\""
+  },
+  "manufacturing": {
+    "source": "bls",
+    "ids": ["CES3000000001"],
+    "start_year": 1990,
+    "units": "thousands",
+    "decimals": 1,
+    "title": "Manufacturing employment",
+    "subtitle": "All employees, manufacturing, seasonally adjusted",
+    "note": "CES3000000001, the same series BLS-CPS-Jobs-Numbers/05_goods_loglines.R pulls as its `manufacturing` column. A level, not a change -- see `manufacturing_change` for the monthly-change counterpart. Raw BLS units are thousands of persons; decimals:1 keeps a tenth-of-a-million of on-screen precision (12.9M vs 12.8M) since this series moves slowly month to month -- decimals:0 would flatten most months to the same printed value. start_year:1990 overrides fetch.R's default (2010) -- the manufacturing-employment-level video zooms out to a 1990 peak, which the default window doesn't reach."
+  },
+  "manufacturing_change": {
+    "source": "bls",
+    "ids": ["CES3000000001"],
+    "start_year": 1990,
+    "expr": "CES3000000001 - dplyr::lag(CES3000000001, 1)",
+    "units": "count",
+    "decimals": 0,
+    "title": "Manufacturing employment",
+    "subtitle": "Monthly change in manufacturing payrolls",
+    "note": "Same construction as `payrolls_change` (CES0000000001 differenced month-over-month via the direct BLS API) but for CES3000000001 (manufacturing only). Added for a 'what happened to manufacturing this month' bar video -- manufacturing payrolls have been flat to declining through 2025-2026 despite reshoring/tariff claims, which is the headline this series exists to check print by print, not assume. start_year:1990 matches `manufacturing` above so both series share the same fetched range, even though this video's own window only ever shows recent months."
+  },
+  "women_change": {
+    "source": "bls",
+    "ids": ["CES0000000010"],
+    "expr": "CES0000000010 - dplyr::lag(CES0000000010, 1)",
+    "units": "count",
+    "decimals": 0,
+    "title": "Women's employment",
+    "subtitle": "Monthly change in women's nonfarm payrolls",
+    "note": "CES0000000010 (women employees, total nonfarm) differenced month-over-month, same pattern as `payrolls_change`. Matches the `women` column in BLS-CPS-Jobs-Numbers/04_health_care_gender.R (`CES0000000010 - lag(CES0000000010, 1)`). Paired with `men_change` (below) as the two components of a stacked men/women monthly-change bar video: women_change + men_change reconstructs `payrolls_change` exactly, by construction, since men_change is defined as the residual."
+  },
+  "men_change": {
+    "source": "bls",
+    "ids": ["CES0000000001", "CES0000000010"],
+    "expr": "(CES0000000001 - dplyr::lag(CES0000000001, 1)) - (CES0000000010 - dplyr::lag(CES0000000010, 1))",
+    "units": "count",
+    "decimals": 0,
+    "title": "Men's employment",
+    "subtitle": "Monthly change in men's nonfarm payrolls",
+    "note": "Not a direct BLS series -- BLS publishes a 'women employees' series (CES0000000010) but no men-only counterpart, so this is total-minus-women, the same residual BLS-CPS-Jobs-Numbers/04_health_care_gender.R computes (`men = total_nonfarm - women`), expressed as a difference-of-differences so it's a monthly change like `women_change` rather than a level. Both ids are pulled in one BLS request (`ids`) so the two differences come from the same fetch vintage of CES0000000001, not a separately-fetched copy that could drift a revision out of sync with `women_change`'s own CES0000000001-derived total."
   }
 }

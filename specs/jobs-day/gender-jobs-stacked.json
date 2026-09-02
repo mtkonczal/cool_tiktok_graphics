@@ -1,0 +1,17 @@
+{
+  "id": "jobs-day-gender-stacked",
+  "type": "bar",
+  "theme": "butter_on_espresso",
+  "chrome": {
+    "title": "Who gained jobs",
+    "subtitle": "Monthly nonfarm payroll change, by sex"
+  },
+  "series": [
+    { "ref": "men_change", "label": "Men" },
+    { "ref": "women_change", "label": "Women" }
+  ],
+  "stacked": true,
+  "window": ["2025-12-01", "latest"],
+  "revealSeconds": 4.0,
+  "holdSeconds": 8.0
+}

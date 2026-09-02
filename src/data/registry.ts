@@ -14,6 +14,10 @@ import payrollsChange1st from "./payrolls_change_1st.json";
 import payrollsChange2nd from "./payrolls_change_2nd.json";
 import payrollsChange3rd from "./payrolls_change_3rd.json";
 import payrollsChange from "./payrolls_change.json";
+import manufacturing from "./manufacturing.json";
+import manufacturingChange from "./manufacturing_change.json";
+import menChange from "./men_change.json";
+import womenChange from "./women_change.json";
 import { DataRow } from "../engine/scales";
 
 export const SERIES_DATA: Record<string, DataRow[]> = {
@@ -29,6 +33,10 @@ export const SERIES_DATA: Record<string, DataRow[]> = {
   payrolls_change_2nd: payrollsChange2nd as DataRow[],
   payrolls_change_3rd: payrollsChange3rd as DataRow[],
   payrolls_change: payrollsChange as DataRow[],
+  manufacturing: manufacturing as DataRow[],
+  manufacturing_change: manufacturingChange as DataRow[],
+  men_change: menChange as DataRow[],
+  women_change: womenChange as DataRow[],
 };
 
 export function seriesData(ref: string): DataRow[] {

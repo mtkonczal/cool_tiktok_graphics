@@ -1,0 +1,13 @@
+{
+  "id": "jobs-day-manufacturing-bar",
+  "type": "bar",
+  "theme": "butter_on_espresso",
+  "chrome": {
+    "title": "Manufacturing jobs",
+    "subtitle": "Monthly change in manufacturing payrolls"
+  },
+  "series": [{ "ref": "manufacturing_change", "label": "Monthly change" }],
+  "window": ["2025-12-01", "latest"],
+  "revealSeconds": 3.0,
+  "holdSeconds": 10.0
+}

@@ -40,6 +40,17 @@ export type BarSpec = {
    * series must share the same underlying date grid (aligned the same way
    * LineVideo aligns a secondary series onto the primary's). */
   series: BarSeriesSpec[];
+  /** When true, 2+ series stack into one bar per period instead of sitting
+   * side by side (grouped, the default) -- e.g. men/women as the two signed
+   * components of one month's total nonfarm change. Positive values stack
+   * upward from zero in series order, negative values stack downward from
+   * zero in series order (not a naive sequential cumsum, which would let a
+   * negative component run the stack below an already-negative baseline) --
+   * so the bar's total shape still reads as "gains above the line, losses
+   * below," even in a month where one series is negative. Ignored (grouped
+   * rendering, unchanged) for a single-series spec, where there's nothing to
+   * stack -- see BarBody's `stacked` prop. */
+  stacked?: boolean;
   /** [start, end] -- literal dates or "latest", one bar-group per month in
    * this range. No relative tokens: a bar spec's window IS what's on screen,
    * there is no separate zoomed/panned view like a line spec's shots have. */
@@ -107,6 +118,7 @@ export const BarVideo: React.FC<BarSpec> = (spec) => {
         palette={palette}
         type={theme.type}
         negativeColor={palette.accent}
+        stacked={spec.stacked}
       />
     </ChartChrome>
   );

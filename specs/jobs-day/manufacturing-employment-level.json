@@ -1,0 +1,27 @@
+{
+  "id": "jobs-day-manufacturing-level",
+  "theme": "butter_on_espresso",
+  "chrome": {
+    "title": "Manufacturing jobs"
+  },
+  "series": [{ "ref": "manufacturing" }],
+  "window": ["1990-01-01", "latest"],
+  "waypoints": ["max", "2019-12-01", "latest"],
+  "waypointAnchor": "point",
+  "annotations": [
+    "recessions",
+    {
+      "kind": "hline",
+      "value": "mean:2024-01-01..latest",
+      "label": "2024–2026 average",
+      "labelAt": "1993-01-01",
+      "from": "zoom"
+    }
+  ],
+  "shots": [
+    { "kind": "draw", "seconds": 3.5, "window": ["2015-01-01", "latest"] },
+    { "kind": "hold", "seconds": 6.0 },
+    { "kind": "zoom", "seconds": 3.0, "window": ["1990-01-01", "latest"] },
+    { "kind": "hold", "seconds": 10.0 }
+  ]
+}
