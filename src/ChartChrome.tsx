@@ -1,7 +1,8 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import "./fonts";
-import { Palette, PETROL, FRAME, ROW, TABULAR, TEXTSAFE, TYPE } from "./theme";
+import { Palette, PETROL, FRAME, ROW, TABULAR, TEXTSAFE, TYPE as DEFAULT_TYPE } from "./theme";
+import { ThemeType } from "./themes/types";
 
 // Shared "chrome" for every chart in this library: background and the title
 // block. Chart-type-specific compositions render their own SVG as children.
@@ -18,8 +19,15 @@ export const ChartChrome: React.FC<{
   /** Second subtitle line, for when the first would run past TEXTSAFE. */
   subtitle2?: string;
   palette?: Palette;
+  /** The active theme's type scale (src/themes/) -- defaults to
+   * konczal_webpage's for any caller that isn't theme-aware (BarVideo,
+   * RipCardReveal, ListReveal). Shadows the module-level `TYPE` import
+   * below, so title/subtitle rendering follows the resolved theme without
+   * touching the JSX itself. */
+  type?: ThemeType;
   children: React.ReactNode;
-}> = ({ title, subtitle, subtitle2, palette = PETROL, children }) => {
+}> = ({ title, subtitle, subtitle2, palette = PETROL, type = DEFAULT_TYPE, children }) => {
+  const TYPE = type;
   return (
     <AbsoluteFill style={{ backgroundColor: palette.bg }}>
       <svg

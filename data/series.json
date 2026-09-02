@@ -5,7 +5,7 @@
     "units": "percent",
     "decimals": 1,
     "title": "Prime-age employment rate",
-    "subtitle": "Employed share of the population, ages 25\u201354",
+    "subtitle": "Employed share of the population, ages 25–54",
     "note": "Used at two windows in the current videos (data_1995_present.json, data_2019_present.json). Both are slices of this same series; Phase 2's spec windows replace the need for two files."
   },
   "prime_lfpr": {
@@ -14,7 +14,7 @@
     "units": "percent",
     "decimals": 1,
     "title": "Prime-age labor force participation",
-    "subtitle": "Labor force share of the population, ages 25\u201354",
+    "subtitle": "Labor force share of the population, ages 25–54",
     "note": "Companion series to prime_epop -- same BLS LNS convention (12 = employment-population ratio, 11 = labor force participation rate), same age slice, same population base. LFPR >= EPOP always (everyone employed is in the labor force; the gap is the unemployed share). Added for a 2-line 'employment vs. participation' comparison video, not a replacement for prime_epop."
   },
   "unrate": {
@@ -46,7 +46,7 @@
     "decimals": 0,
     "title": "Job openings",
     "subtitle": "Total nonfarm job openings, seasonally adjusted",
-    "note": "Raw FRED units are thousands. Series starts December 2000 (JOLTS history) \u2014 the JSON file itself starts there, no leading nulls, since fetch.R pulls each series alone rather than padding it against a longer one."
+    "note": "Raw FRED units are thousands. Series starts December 2000 (JOLTS history) — the JSON file itself starts there, no leading nulls, since fetch.R pulls each series alone rather than padding it against a longer one."
   },
   "vu_ratio": {
     "source": "derived",

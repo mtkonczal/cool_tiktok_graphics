@@ -1,5 +1,6 @@
 {
   "id": "jobs-day-total-employment",
+  "theme": "butter_on_espresso",
   "series": [{ "ref": "payrolls_change" }],
   "chrome": {
     "title": "Total employment",

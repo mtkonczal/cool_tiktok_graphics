@@ -15,7 +15,8 @@ import {
 import { Unit, fmtAxis } from "../engine/format";
 import { Waypoint } from "../engine/waypoints";
 import { ResolvedAnnotation } from "../engine/annotations";
-import { MARK, MAX_LABEL_SHRINK, PETROL, Palette, PLOT, ROW, STROKE, TEXTSAFE, TYPE } from "../theme";
+import { MARK, MAX_LABEL_SHRINK, PETROL, Palette, PLOT, ROW, STROKE, TEXTSAFE, TYPE as DEFAULT_TYPE } from "../theme";
+import { ThemeType } from "../themes/types";
 
 // The reusable line-chart body: 1 series gets the full reveal treatment
 // (waypoint callouts that pop in and shrink with zoom, an optional reference
@@ -62,6 +63,17 @@ export const LineBody: React.FC<{
   unit: Unit;
   zoomFactor?: number;
   palette?: Palette;
+  /** The active theme's type scale (src/themes/) -- defaults to
+   * konczal_webpage's for any caller that isn't theme-aware. Shadows the
+   * module-level `TYPE` import below, so every existing `TYPE.xxx`
+   * reference in this file automatically follows the resolved theme
+   * without each one needing to change. */
+  type?: ThemeType;
+  /** src/themes/types.ts's Theme["marks"]["latestSolid"] -- false (default)
+   * keeps the existing ring-with-a-hole construction every waypoint dot
+   * uses today, just accent-colored for "latest"; true renders "latest" as
+   * a solid accent disc with a thin bg-colored border instead. */
+  latestSolid?: boolean;
   waypoints?: Waypoint[];
   annotations?: ResolvedAnnotation[];
 }> = ({
@@ -73,9 +85,12 @@ export const LineBody: React.FC<{
   unit,
   zoomFactor = 1,
   palette = PETROL,
+  type = DEFAULT_TYPE,
+  latestSolid = false,
   waypoints = [],
   annotations = [],
 }) => {
+  const TYPE = type;
   const primary = series[0].data;
   // Dot marks and label text shrink with zoom the same way waypoints do --
   // shared across both series-count branches since hline/vline/point labels
@@ -329,29 +344,42 @@ export const LineBody: React.FC<{
           // center-distance check missed that and still let mid-zoom frames
           // (full-size text, not yet fully compressed) collide. Recomputed
           // every frame, so it unwinds on its own as the view zooms back in.
-          const ROW_STAGGER = 70;
-          const EDGE_PAD = 16;
-          // Was 12 -- too tight to catch two "point"-anchor labels whose
+          const dateFontPx = TYPE.date.size / textZoom;
+          const valueFontPx = TYPE.value.size / textZoom;
+          // The padding constants below were tuned by rendering against
+          // konczal_webpage's 46px value text, but expressed as a fraction
+          // of the theme's OWN (un-zoomed) value size rather than a fixed
+          // pixel count -- a theme with a meaningfully larger or smaller
+          // type scale (e.g. butter_on_espresso's 66px) gets correctly-
+          // scaled spacing automatically instead of the same absolute
+          // pixels tuned for a different font size, which under-spaced
+          // badly at 66px (found by rendering that theme's unrate_bls).
+          // Deliberately TYPE.value.size, not valueFontPx (which also
+          // divides by textZoom) -- this should vary by theme, not by how
+          // zoomed-out the current shot happens to be, so a zoomed-out
+          // konczal_webpage frame keeps the exact padding it always had.
+          const PAD_SCALE = TYPE.value.size / 46;
+          const ROW_STAGGER = 70 * PAD_SCALE;
+          const EDGE_PAD = 16 * PAD_SCALE;
+          // Was a flat 48 -- too tight to catch two "point"-anchor labels whose
           // calloutYValue/calloutYDate happen to land a real line-height
           // apart in data space but read as touching on screen, since top/
           // bottom above are text BASELINES, not full glyph boxes (no room
-          // for the value line's own height). ~48, close to TYPE.value.size,
-          // is the minimum gap that actually clears one line of text --
+          // for the value line's own height). ~48 at the original 46px value
+          // size is the minimum gap that actually clears one line of text --
           // found by rendering unrate_bls with 3 closely-spaced recent-month
-          // waypoints, where 12 let "Jun 2026"/"4.19%" collide into the
-          // point above it.
-          const VERT_PAD = 48;
-          const INLINE_GAP = 14; // gap between value and date text in "inline" dateStyle
-          const BESIDE_LIFT = 14; // small lift off the dot's own height for "besideDot", so text clears the line stroke
+          // waypoints, where a tighter pad let "Jun 2026"/"4.19%" collide into
+          // the point above it.
+          const VERT_PAD = 48 * PAD_SCALE;
+          const INLINE_GAP = 14 * PAD_SCALE; // gap between value and date text in "inline" dateStyle
+          const BESIDE_LIFT = 14 * PAD_SCALE; // small lift off the dot's own height for "besideDot", so text clears the line stroke
           // Horizontal clearance from the dot for "besideDot" labels -- without
           // it, an "end"-anchored label's edge lands exactly at cx, the same x
           // the dot itself is centered on, so the two visibly touch/overlap
           // (found by rendering unrate_bls's "latest" point, inline mode, right
           // at the dot). Not needed for the "above" (headroom) position -- that
           // one is already far enough above the dot vertically.
-          const DOT_PAD = MARK.waypoint / zoomFactor + 8;
-          const dateFontPx = TYPE.date.size / textZoom;
-          const valueFontPx = TYPE.value.size / textZoom;
+          const DOT_PAD = MARK.waypoint / zoomFactor + 8 * PAD_SCALE;
           const laidOut = visible.map((wp) => {
             const cx = px(wp.idx, xDomain);
             const anchor = svgAnchor(haFor(wp.idx, xDomain));
@@ -574,8 +602,21 @@ export const LineBody: React.FC<{
                 {rowOffset > 0 && (
                   <line x1={cx} y1={cy} x2={cx} y2={leaderTargetY} stroke={palette.dim} strokeWidth={STROKE.tick} />
                 )}
-                <circle cx={cx} cy={cy} r={MARK.waypoint / zoomFactor} fill={isLatest ? palette.accent : palette.series} />
-                <circle cx={cx} cy={cy} r={MARK.waypointCore / zoomFactor} fill={palette.bg} />
+                {latestSolid && isLatest ? (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={(MARK.waypoint + 3) / zoomFactor}
+                    fill={palette.accent}
+                    stroke={palette.bg}
+                    strokeWidth={7 / zoomFactor}
+                  />
+                ) : (
+                  <>
+                    <circle cx={cx} cy={cy} r={MARK.waypoint / zoomFactor} fill={isLatest ? palette.accent : palette.series} />
+                    <circle cx={cx} cy={cy} r={MARK.waypointCore / zoomFactor} fill={palette.bg} />
+                  </>
+                )}
                 {labelNodes}
               </g>
             );

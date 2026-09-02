@@ -8,7 +8,8 @@ import { alignToGrid, ease } from "../engine/scales";
 import { resolveIndex } from "../engine/waypoints";
 import { seriesData } from "../data/registry";
 import { seriesMeta } from "../data/seriesMeta";
-import { FRAME, PAPER, PETROL, Palette } from "../theme";
+import { FRAME, Palette } from "../theme";
+import { resolveTheme } from "../themes";
 
 export const FPS = 30;
 
@@ -27,9 +28,17 @@ export type BarSpec = {
   type: "bar";
   chrome?: { title?: string; subtitle?: string };
   palette?: "petrol" | "paper";
-  /** 2-3 series, plotted as one bar per series per period, grouped by date.
-   * All series must share the same underlying date grid (aligned the same
-   * way LineVideo aligns a secondary series onto the primary's). */
+  /** Theme id (src/themes/), same field/registry/resolver LineSpec uses --
+   * defaults to konczal_webpage (src/themes/index.ts's resolveTheme) when
+   * omitted, so every bar spec written before this existed still renders
+   * exactly as it did before. */
+  theme?: string;
+  /** 1-3 series, plotted as one bar per series per period, grouped by date.
+   * A single series colors each bar by sign instead (see BarBody's
+   * `negativeColor`) rather than showing a redundant one-swatch legend --
+   * 2-3 series draw grouped bars with a per-series legend, unchanged. All
+   * series must share the same underlying date grid (aligned the same way
+   * LineVideo aligns a secondary series onto the primary's). */
   series: BarSeriesSpec[];
   /** [start, end] -- literal dates or "latest", one bar-group per month in
    * this range. No relative tokens: a bar spec's window IS what's on screen,
@@ -54,7 +63,11 @@ export const calculateBarMetadata: CalculateMetadataFunction<BarSpec> = async ({
 
 export const BarVideo: React.FC<BarSpec> = (spec) => {
   const frame = useCurrentFrame();
-  const palette: Palette = spec.palette === "paper" ? PAPER : PETROL;
+  // resolveTheme(undefined) is konczal_webpage, whose palettes ARE the
+  // PETROL/PAPER constants below -- so this one line covers both the
+  // theme-aware and theme-less cases without a branch.
+  const theme = resolveTheme(spec.theme);
+  const palette: Palette = spec.palette === "paper" ? theme.palettes.paper : theme.palettes.petrol;
 
   const refs = spec.series.map((s) => s.ref);
   const rawByRef = refs.map((ref) => seriesData(ref));
@@ -83,7 +96,7 @@ export const BarVideo: React.FC<BarSpec> = (spec) => {
   const subtitle = spec.chrome?.subtitle ?? primaryMeta.subtitle;
 
   return (
-    <ChartChrome title={title} subtitle={subtitle} palette={palette}>
+    <ChartChrome title={title} subtitle={subtitle} palette={palette} type={theme.type}>
       <BarBody
         groups={groups}
         seriesLabels={spec.series.map((s) => s.label)}
@@ -92,6 +105,8 @@ export const BarVideo: React.FC<BarSpec> = (spec) => {
         decimals={primaryMeta.decimals}
         revealProgress={revealProgress}
         palette={palette}
+        type={theme.type}
+        negativeColor={palette.accent}
       />
     </ChartChrome>
   );

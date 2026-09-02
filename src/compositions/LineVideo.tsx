@@ -10,7 +10,8 @@ import { Waypoint, WaypointToken, belowDotOverride, makeWaypoints, resolveIndex 
 import { AnnotationSpec, resolveAnnotations } from "../engine/annotations";
 import { seriesData } from "../data/registry";
 import { seriesMeta } from "../data/seriesMeta";
-import { FRAME, PAPER, PETROL, Palette } from "../theme";
+import { FRAME, Palette } from "../theme";
+import { resolveTheme } from "../themes";
 
 export const FPS = 30;
 
@@ -30,6 +31,11 @@ export type LineSpec = {
   series: { ref: string }[];
   chrome?: { title?: string; subtitle?: string };
   palette?: "petrol" | "paper";
+  /** Which src/themes/*.ts design to render with -- palette, type scale,
+   * and mark style all come from this. Defaults to "konczal_webpage" (see
+   * src/themes/index.ts's resolveTheme) when omitted, so every spec
+   * written before themes existed renders exactly as it did before. */
+  theme?: string;
   /** The full extent used to resolve waypoint/avg tokens ("min"/"max"/
    * "latest") -- independent of what's actually on screen at any given
    * moment, which each shot's own `window` controls. Also doubles as the
@@ -86,7 +92,8 @@ export const calculateLineMetadata: CalculateMetadataFunction<LineSpec> = async 
 
 export const LineVideo: React.FC<LineSpec> = (spec) => {
   const frame = useCurrentFrame();
-  const palette: Palette = spec.palette === "paper" ? PAPER : PETROL;
+  const theme = resolveTheme(spec.theme);
+  const palette: Palette = spec.palette === "paper" ? theme.palettes.paper : theme.palettes.petrol;
 
   const refs = spec.series.map((s) => s.ref);
   const rawByRef = refs.map((ref) => seriesData(ref));
@@ -168,7 +175,7 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
   const subtitle = spec.chrome?.subtitle ?? (spec.series.length === 1 ? primaryMeta.subtitle : undefined);
 
   return (
-    <ChartChrome title={title ?? spec.id} subtitle={subtitle} palette={palette}>
+    <ChartChrome title={title ?? spec.id} subtitle={subtitle} palette={palette} type={theme.type}>
       <LineBody
         series={lineSeries}
         xDomain={state.xDomain}
@@ -178,6 +185,8 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
         unit={primaryMeta.units}
         zoomFactor={state.zoomFactor}
         palette={palette}
+        type={theme.type}
+        latestSolid={theme.marks.latestSolid}
         waypoints={waypoints}
         annotations={annotations}
       />

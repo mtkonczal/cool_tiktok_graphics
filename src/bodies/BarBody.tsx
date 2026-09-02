@@ -1,7 +1,8 @@
 import React from "react";
 import { DataRow, chooseYStep, monthDate, py } from "../engine/scales";
 import { Unit, fmt, fmtAxis } from "../engine/format";
-import { PETROL, Palette, PLOT, ROW, STROKE, TEXTSAFE, TYPE } from "../theme";
+import { PETROL, Palette, PLOT, ROW, STROKE, TEXTSAFE, TYPE as DEFAULT_TYPE } from "../theme";
+import { ThemeType } from "../themes/types";
 
 // The grouped-bar body: N month-groups, each holding 2-3 bars (e.g. 1st/2nd/
 // 3rd BLS estimate), revealed group-by-group left to right -- the categorical
@@ -41,8 +42,20 @@ export const BarBody: React.FC<{
    * animating group's grow-in progress (already eased by the caller). */
   revealProgress: number;
   palette?: Palette;
-}> = ({ groups, seriesLabels, seriesColors, unit, decimals, revealProgress, palette = PETROL }) => {
+  /** The active theme's type scale (src/themes/) -- defaults to
+   * konczal_webpage's, same optional-prop-plus-shadow pattern LineBody/
+   * ChartChrome use, so BarVideo becomes theme-aware without touching every
+   * TYPE.xxx call site below. */
+  type?: ThemeType;
+  /** Fill for a bar whose value is negative, for a single-series chart only
+   * (e.g. a monthly change that can go either way) -- a grouped multi-series
+   * chart's bars are already colored per-series (1st/2nd/3rd estimate) and
+   * ignore this. */
+  negativeColor?: string;
+}> = ({ groups, seriesLabels, seriesColors, unit, decimals, revealProgress, palette = PETROL, type = DEFAULT_TYPE, negativeColor }) => {
+  const TYPE = type;
   const n = groups.length;
+  const signColored = seriesLabels.length === 1 && negativeColor !== undefined;
 
   let lo = 0,
     hi = 0;
@@ -76,7 +89,10 @@ export const BarBody: React.FC<{
   const LEGEND_Y = 390;
   const SWATCH = 30;
   let legendX = TEXTSAFE.x;
-  const legendEls = seriesLabels.map((label, i) => {
+  // Skip the legend entirely for a single-series chart -- one swatch
+  // restating the one series a title/subtitle already names is clutter,
+  // not information. Grouped charts (2-3 series) keep it.
+  const legendEls = seriesLabels.length < 2 ? [] : seriesLabels.map((label, i) => {
     const textW = label.length * TYPE.subtitle.size * 0.56;
     const el = (
       <React.Fragment key={label}>
@@ -153,7 +169,6 @@ export const BarBody: React.FC<{
         const animating = gi === Math.floor(revealProgress);
         if (!revealed && !animating) return null;
         const localProgress = revealed ? 1 : revealProgress - gi;
-
         const clusterLeft = PLOT.left + gi * slotW + (slotW - (barW * seriesLabels.length + barGap * (seriesLabels.length - 1))) / 2;
 
         return (
@@ -166,9 +181,10 @@ export const BarBody: React.FC<{
               const top = Math.min(y, zeroY);
               const height = Math.abs(y - zeroY);
               const labelY = v >= 0 ? y - 14 : y + TYPE.value.size * 0.7;
+              const fill = signColored && v < 0 ? negativeColor! : seriesColors[si];
               return (
                 <React.Fragment key={`bar-${gi}-${si}`}>
-                  <rect x={x} y={top} width={barW} height={height} fill={seriesColors[si]} rx={3} />
+                  <rect x={x} y={top} width={barW} height={height} fill={fill} rx={3} />
                   {localProgress > 0.85 && (
                     <text
                       x={x + barW / 2}

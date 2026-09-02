@@ -8,6 +8,16 @@ const FACES: { family: string; weight: number; file: string }[] = [
   { family: "Inter", weight: 500, file: "fonts/inter-latin-500-normal.woff2" },
   { family: "Inter", weight: 700, file: "fonts/inter-latin-700-normal.woff2" },
   { family: "Inter", weight: 800, file: "fonts/inter-latin-800-normal.woff2" },
+  // "butter_on_espresso" theme (src/themes/). Archivo ships as a variable
+  // font from Google -- one file, four @font-face declarations each with a
+  // different fixed weight, same as Google's own CSS does; Chrome (which
+  // Remotion renders through) matches font-weight against the variable
+  // font's weight axis correctly.
+  { family: "Playfair Display", weight: 800, file: "fonts/playfairdisplay-latin-800-normal.woff2" },
+  { family: "Archivo", weight: 400, file: "fonts/archivo-latin-variable.woff2" },
+  { family: "Archivo", weight: 600, file: "fonts/archivo-latin-variable.woff2" },
+  { family: "Archivo", weight: 700, file: "fonts/archivo-latin-variable.woff2" },
+  { family: "Archivo", weight: 800, file: "fonts/archivo-latin-variable.woff2" },
 ];
 
 // font-display:block matters here: with `swap`, Remotion can capture a frame

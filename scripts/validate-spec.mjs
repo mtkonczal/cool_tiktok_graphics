@@ -26,6 +26,9 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const RELATIVE_RE = /^[+-]\d+m$/;
 const ANNOTATION_KINDS = ["hline", "vline", "band", "point", "free"];
 const SHOT_KINDS = ["draw", "hold", "zoom", "pan", "fade"];
+// Mirrors src/themes/index.ts's THEMES registry -- add a theme file there
+// and a name here. Shared by both LineSpec and BarSpec validation.
+const THEME_IDS = ["konczal_webpage", "butter_on_espresso"];
 
 function isString(v) {
   return typeof v === "string";
@@ -171,8 +174,8 @@ function validateBarSpec(spec, file) {
 
   if (!isString(spec.id)) fail("id: required string");
 
-  if (!Array.isArray(spec.series) || spec.series.length < 2 || spec.series.length > 3) {
-    fail("series: required array of 2-3 { ref, label }");
+  if (!Array.isArray(spec.series) || spec.series.length < 1 || spec.series.length > 3) {
+    fail("series: required array of 1-3 { ref, label }");
   } else {
     spec.series.forEach((s, i) => {
       if (!isPlainObject(s) || !isString(s.ref) || !isString(s.label)) {
@@ -193,6 +196,10 @@ function validateBarSpec(spec, file) {
 
   if (spec.palette !== undefined && spec.palette !== "petrol" && spec.palette !== "paper") {
     fail(`palette: must be "petrol" or "paper", got ${JSON.stringify(spec.palette)}`);
+  }
+
+  if (spec.theme !== undefined && !THEME_IDS.includes(spec.theme)) {
+    fail(`theme: "${spec.theme}" is not a known theme (have: ${THEME_IDS.join(", ")})`);
   }
 
   if (spec.window === undefined) {
@@ -232,6 +239,10 @@ function validateLineSpec(spec, file) {
 
   if (spec.palette !== undefined && spec.palette !== "petrol" && spec.palette !== "paper") {
     fail(`palette: must be "petrol" or "paper", got ${JSON.stringify(spec.palette)}`);
+  }
+
+  if (spec.theme !== undefined && !THEME_IDS.includes(spec.theme)) {
+    fail(`theme: "${spec.theme}" is not a known theme (have: ${THEME_IDS.join(", ")})`);
   }
 
   if (spec.window === undefined) {

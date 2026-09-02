@@ -1,7 +1,7 @@
 {
   "name": "payrolls_change",
   "source": "bls",
-  "fetched_at": "2026-09-01T20:22:32Z",
+  "fetched_at": "2026-09-02T00:30:21Z",
   "units": "count",
   "decimals": 0,
   "row_count": 199,

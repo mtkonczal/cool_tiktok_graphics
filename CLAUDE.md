@@ -132,6 +132,9 @@ and its default:
   "waypoints": ["min", "2024-07-01", "max", "latest"],  // optional. See Section 7.
   "waypointAnchor": "point",             // optional, "max" (default) or "point"
   "waypointBelowDot": "latest",          // optional -- see Section 7
+  "waypointHideDate": ["min", "max"],    // optional -- see Section 7. Listed tokens drop the date line, value only.
+  "waypointBesideDot": ["-1m", "latest"],// optional -- see Section 7. Listed tokens anchor beside their own dot, not above it.
+  "theme": "butter_on_espresso",         // optional, "konczal_webpage" (default) -- see Section 13
   "displayDecimals": 1,                  // optional -- overrides the registry's storage decimals for on-screen labels
   "waypointFade": { "token": "2023-05-01", "duringShot": "zoom" },  // optional. duringShot defaults to "zoom".
   "annotations": [ /* see Section 6 */ ],
@@ -286,7 +289,29 @@ where `"max"` would strand a low point's label far above its dot.
 **`waypointBelowDot`**: names one waypoint (by token) to render its label
 below the dot instead of above — for the one-off case where an above-dot
 label would extend back through the line itself (e.g. a "latest" point
-sitting just right of, and below, a recent peak).
+sitting just right of, and below, a recent peak). Superseded for a given
+waypoint by putting it in `waypointBesideDot` instead (below), which covers
+the same "would run through the line" problem more generally.
+
+**`waypointHideDate`**: tokens (by name, matching entries in `waypoints`)
+whose label drops the date line entirely — value only, one line. Anything
+not listed keeps its date, unchanged from the default two-line callout.
+Useful when several waypoints are labeled close together and the date is
+redundant with the x-axis (which, since Section 8's graduated ticks, often
+already shows the month for anything zoomed in enough to have this problem).
+
+**`waypointBesideDot`**: tokens whose label anchors at the point's own
+height (beside its dot) instead of the usual headroom-based position above
+it — reads as a small trailing readout next to the line rather than a
+callout floating above it, e.g. for "the last three months" sitting close
+together near a line's current end. Combines with `waypointHideDate`:
+listed in both → value and date on one line, date to whichever side the
+label's normal edge-avoidance anchor extends (`Waypoint.dateStyle:
+"inline"`); besideDot alone → value only, still beside the dot (`"none"`);
+neither → the original above-the-dot position, two-line stacked date+value
+(`"stacked"`, unchanged default). Not itself a fix for a label running
+through the line the way `waypointBelowDot` is — it repositions relative to
+the dot, it doesn't check what the line is doing nearby.
 
 **Collision handling among several waypoint labels** (`LineBody.tsx`) is a
 greedy first-fit: each label takes the lowest of up to 4 stacked rows
@@ -335,11 +360,31 @@ sparse waypoints (the common case) render exactly as before.
   screen** (`engine/scales.ts`'s `xAxisTicks`), not fixed at "one tick per
   January": under ~2.5 years visible, ticks are per-calendar-month instead
   (spaced out — every month, every 2nd/3rd/6th — to stay at roughly 8 or
-  fewer), each labelled with just the month name except where the year
-  rolls over. Above that, it's the original sparse-year behavior
-  (`yearStep`-thinned Januaries) unchanged — a multi-decade zoomed-out shot
-  (`prime-epop-zoomout.json`) still reads `'95 '00 '05...`, not a wall of
-  month ticks.
+  fewer). Above that, a wider step (in whole years) applies instead, same
+  mechanism — a multi-decade zoomed-out shot (`prime-epop-zoomout.json`)
+  still reads a handful of ticks, not a wall of them.
+- **Ticks are built backward from the rightmost visible date, not forward
+  from the leftmost** — mirrors `tidyusmacro::date_breaks_n()`/
+  `date_breaks_gg()` (this project's companion R package): step back from
+  `iHi` by a fixed cadence until passing `iLo`, so the actual endpoint is
+  always a tick and every tick is evenly spaced from it, with whatever
+  partial interval is left over landing at the old (least important) end
+  instead of the new one. An earlier forward-from-`iLo` version had to
+  special-case forcing the true endpoint in as an extra tick and dropping
+  whichever regular tick sat closest to it, which left an uneven — sometimes
+  visibly doubled — gap right next to the most important tick (found by
+  rendering `jobs-day-unrate`: a forward grid landed on Sep/Mar, so forcing
+  in a July endpoint dropped the nearby Mar tick and stranded Sep on its
+  own). Anchoring from `iHi` needs no such case.
+- **Every tick shows month + year, stacked two lines** (`"Jan"` / `"’25"`),
+  **except the wide (multi-year) tier when the endpoint's month is
+  January**, where the month is dropped (every tick shares that same
+  anchor month by construction, so it would just repeat "Jan" 5-8 times).
+  A wide-tier view anchored on any other month — most of them, in practice
+  — shows that month on every tick (`prime-epop-zoomout.json`'s fully
+  zoomed-out shot currently reads `Jul '96 Jul '01 Jul '06 ... Jul '26`,
+  not bare years), which is a real, deliberate departure from this
+  project's original all-January convention, not an oversight.
 
 ## 9. Commands
 
@@ -522,3 +567,90 @@ on (`"sequence"` / `"bar"` / anything else falls through to the `LineSpec`
 validator) — a spec with no `"type"` at all is still assumed to be a
 `LineSpec`, unchanged from before `BarVideo` existed. The composition itself
 still needs registering in `src/Root.tsx` the normal Remotion way.
+
+## 13. Themes (`src/themes/`)
+
+A **theme** is a swappable visual design for `LineVideo`/`LineBody`: palette,
+type scale (font family/size/weight per role), and one mark-style flag.
+Deliberately NOT layout/geometry — `ROW`/`PLOT`/`STROKE`/`MARK` in
+`theme.ts` stay shared across every theme, since those were tuned through
+many rendered-and-checked iterations specific to this engine's proportions
+(waypoint collision-avoidance, safe zones, the axis-above-plot rhythm), not
+a per-design choice. See `src/themes/types.ts`'s `Theme` type comment for
+the same reasoning in more detail.
+
+**One file per theme in `src/themes/`, listed in `src/themes/index.ts`'s
+`THEMES` registry.** `konczal_webpage.ts` is the original design this whole
+chart family launched with (Newsreader + Inter, the mikekonczal.com-derived
+petrol/paper palettes) — it's the default when a spec's top-level `"theme"`
+field is omitted, so every spec written before themes existed still renders
+exactly as it did before. Adding a theme means adding a file shaped like
+that one plus one line in the registry; nothing else needs to change to
+pick it up. `scripts/validate-spec.mjs`'s `THEME_IDS` mirrors the registry
+and needs the same one-line addition.
+
+**A theme's `palettes` still has both a `petrol` and a `paper` key**,
+matching a spec's own existing `"palette": "petrol" | "paper"` field (this
+predates themes and is orthogonal to which theme is active) — a theme with
+only one real design, like `butter_on_espresso`, just points both keys at
+the same colors, so an existing spec's `palette` field never silently
+breaks against a new theme.
+
+**Fonts are still self-hosted woff2** (`src/fonts.ts`, `public/fonts/`),
+matching this repo's existing convention (reproducible offline, no
+mid-render network fetch) — a new theme's fonts need adding to `FACES` in
+`fonts.ts` the same way. `butter_on_espresso`'s Archivo ships from Google as
+a single variable-font file; four `FACES` entries (weights 400/600/700/800)
+all point at that one file, exactly like Google's own served CSS does —
+Chrome (which Remotion renders through) matches `font-weight` against the
+variable font's weight axis correctly, so this isn't four separate files.
+
+**How `LineBody`/`ChartChrome` actually become theme-aware**: both keep
+their original fixed imports (`TYPE` from `theme.ts`, aliased to
+`DEFAULT_TYPE`) as the default for any prop-less caller, but each also
+takes an optional `type` prop; the first line of the component body does
+`const TYPE = type;`, shadowing the module-level import for the rest of the
+function. Every existing `TYPE.xxx` reference in either file therefore
+follows whichever theme was resolved without individually touching each
+call site — `LineVideo.tsx` is the only place that calls `resolveTheme` and
+threads the result through. `BarVideo`/`BarBody`/`RipCardReveal`/`ListReveal`
+aren't theme-aware yet and still read `theme.ts`'s fixed exports directly;
+extending them later means giving them the same optional-prop-plus-shadow
+treatment, not a different mechanism.
+
+**Waypoint collision-avoidance paddings scale with the active theme's type
+size.** `LineBody`'s `VERT_PAD`/`ROW_STAGGER`/`BESIDE_LIFT`/`INLINE_GAP`/
+`DOT_PAD`/`EDGE_PAD` were originally tuned as fixed pixel constants against
+`konczal_webpage`'s 46px value text; they're now each that original pixel
+count times `PAD_SCALE = TYPE.value.size / 46`, so a theme with meaningfully
+bigger or smaller type gets correctly-scaled spacing instead of the same
+absolute pixels tuned for a different font size (`PAD_SCALE` is 1 for
+`konczal_webpage`, so this is a no-op there — checked by rendering, byte-
+identical output). Deliberately keyed to the theme's own (un-zoomed)
+`TYPE.value.size`, not the zoom-divided `valueFontPx` — this should vary by
+theme, not by how zoomed-out the current shot happens to be.
+
+**`butter_on_espresso`'s value size is 52px, not the source brief's 60/66px
+split** (this engine has one value-label size for every waypoint, no per-
+waypoint size hook, so it can't reproduce that split anyway) — at 66px, a
+`waypointBesideDot` label got wide enough to run under a *neighboring*
+waypoint's own dot on `jobs-day-unrate` (5 waypoints in a ~22-month window),
+a collision the row-stagger system doesn't model (a dot never enters the
+stagger competition, since it never moves). 52px rendered clean on that
+same dense spec — checked by rendering, not assumed. If a future theme
+wants materially bigger value text than that, expect to hit the same
+ceiling on any spec with several close-together `waypointBesideDot` labels,
+and either shrink the type or teach the collision system about neighboring
+dots (tried once here, reverted — it over-corrected and pushed a label into
+the axis row instead; a real fix needs more care than a quick pass gives).
+
+**`marks.latestSolid`**: `false` (default, `konczal_webpage`) keeps every
+waypoint dot's existing construction — a solid ring with a bg-colored hole
+in the middle, accent-colored instead of series-colored for "latest" (the
+color switch alone already carries the "this one's different" signal).
+`true` (`butter_on_espresso`) renders "latest" as a solid accent-filled
+disc with a thin bg-colored border instead, via a single `<circle>` with
+`fill`+`stroke` rather than the two-nested-circles technique every other
+dot still uses — a deliberate different construction for a design that
+wants the endpoint to read as a punched-in dot, not another ring in the
+same family as the peak's.

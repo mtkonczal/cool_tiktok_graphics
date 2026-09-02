@@ -1,5 +1,9 @@
 {
   "id": "prime-epop-zoomout",
+  "theme": "butter_on_espresso",
+  "chrome": {
+    "title": "Employment rate"
+  },
   "series": [
     {
       "ref": "prime_epop"
@@ -15,6 +19,7 @@
     "2023-05-01",
     "latest"
   ],
+  "waypointHideDate": ["2023-05-01"],
   "waypointFade": {
     "token": "2023-05-01"
   },

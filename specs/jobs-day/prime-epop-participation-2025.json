@@ -1,8 +1,9 @@
 {
   "id": "prime-epop-participation-2025",
+  "theme": "butter_on_espresso",
   "series": [{ "ref": "prime_epop" }, { "ref": "prime_lfpr" }],
   "chrome": {
-    "title": "Employment & participation",
+    "title": "EPOP vs. LFPR",
     "subtitle": "Ages 25–54, percent of population"
   },
   "window": ["2025-01-01", "latest"],
