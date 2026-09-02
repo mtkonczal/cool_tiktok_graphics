@@ -76,6 +76,15 @@ export const LineBody: React.FC<{
   latestSolid?: boolean;
   waypoints?: Waypoint[];
   annotations?: ResolvedAnnotation[];
+  /** Pixel amount to pull the axis-tick row (rule, ticks, month/year labels)
+   * up toward the title -- for a spec with no subtitle, the row this file
+   * shares with every other spec (`ROW.xaxisRule`/`xaxisLabel`) leaves a
+   * noticeably empty gap under a bare title. Only this header-area row
+   * moves; `PLOT.top`, the actual chart geometry, and every py()-derived
+   * pixel position are untouched, so this can't perturb the tuned-by-eye
+   * waypoint/gridline math the way shifting the plot itself would. Default
+   * 0 leaves every existing spec byte-for-byte unchanged. */
+  topOffset?: number;
 }> = ({
   series,
   xDomain,
@@ -89,8 +98,11 @@ export const LineBody: React.FC<{
   latestSolid = false,
   waypoints = [],
   annotations = [],
+  topOffset = 0,
 }) => {
   const TYPE = type;
+  const xaxisRule = ROW.xaxisRule - topOffset;
+  const xaxisLabel = ROW.xaxisLabel - topOffset;
   const primary = series[0].data;
   // Dot marks and label text shrink with zoom the same way waypoints do --
   // shared across both series-count branches since hline/vline/point labels
@@ -132,14 +144,14 @@ export const LineBody: React.FC<{
 
       {/* x-axis, ABOVE the plot: rule + ticks bind the year labels to the plot
           so they read as an axis rather than as a subtitle under the title. */}
-      <line x1={PLOT.left} y1={ROW.xaxisRule} x2={PLOT.right} y2={ROW.xaxisRule} stroke={palette.grid} strokeWidth={STROKE.grid} />
+      <line x1={PLOT.left} y1={xaxisRule} x2={PLOT.right} y2={xaxisRule} stroke={palette.grid} strokeWidth={STROKE.grid} />
       {xTicks.map(({ idx, lines }) => (
         <React.Fragment key={`x-${idx}`}>
           <line
             x1={px(idx, xDomain)}
-            y1={ROW.xaxisRule}
+            y1={xaxisRule}
             x2={px(idx, xDomain)}
-            y2={ROW.xaxisRule + ROW.xaxisTick}
+            y2={xaxisRule + ROW.xaxisTick}
             stroke={palette.grid}
             strokeWidth={STROKE.tick}
           />
@@ -150,7 +162,7 @@ export const LineBody: React.FC<{
             <text
               key={li}
               x={px(idx, xDomain)}
-              y={ROW.xaxisLabel - (lines.length - 1 - li) * ROW.xaxisLabelLineHeight}
+              y={xaxisLabel - (lines.length - 1 - li) * ROW.xaxisLabelLineHeight}
               fontSize={TYPE.axis.size}
               fontFamily={TYPE.axis.family}
               fontWeight={TYPE.axis.weight}

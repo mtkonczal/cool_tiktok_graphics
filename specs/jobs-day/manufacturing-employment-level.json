@@ -2,7 +2,8 @@
   "id": "jobs-day-manufacturing-level",
   "theme": "butter_on_espresso",
   "chrome": {
-    "title": "Manufacturing jobs"
+    "title": "Manufacturing jobs",
+    "subtitle": ""
   },
   "series": [{ "ref": "manufacturing" }],
   "window": ["1990-01-01", "latest"],

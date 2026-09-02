@@ -74,9 +74,29 @@ export const BarBody: React.FC<{
    * disappears, leaving the light fill contrasting against that same
    * background on its own. */
   stacked?: boolean;
-}> = ({ groups, seriesLabels, seriesColors, unit, decimals, revealProgress, palette = PETROL, type = DEFAULT_TYPE, negativeColor, stacked = false }) => {
+  /** Pixel amount to pull the axis-tick row and legend up toward the title
+   * -- see LineBody's identical prop for why (a subtitle-less spec leaves a
+   * bare title with nothing under it until the tick row). Only header-area
+   * positions move; `PLOT.top` and every py()-derived bar/gridline position
+   * are untouched. Default 0 leaves every existing spec unchanged. */
+  topOffset?: number;
+}> = ({
+  groups,
+  seriesLabels,
+  seriesColors,
+  unit,
+  decimals,
+  revealProgress,
+  palette = PETROL,
+  type = DEFAULT_TYPE,
+  negativeColor,
+  stacked = false,
+  topOffset = 0,
+}) => {
   const TYPE = type;
   const n = groups.length;
+  const xaxisRule = ROW.xaxisRule - topOffset;
+  const xaxisLabel = ROW.xaxisLabel - topOffset;
   const signColored = !stacked && seriesLabels.length === 1 && negativeColor !== undefined;
 
   // Non-stacked: y-domain spans every individual bar's value. Stacked: it
@@ -108,7 +128,14 @@ export const BarBody: React.FC<{
   const pad = span * 0.22;
   const yDomain: [number, number] = [lo - pad, hi + pad];
 
-  const yStep = chooseYStep(yDomain);
+  // maxTicks=5, not chooseYStep's own default of 3 -- a bar chart's zero
+  // baseline is already drawn separately (heavier stroke, below), so 3
+  // ticks routinely collapses to just one non-zero gridline (e.g. -13..15
+  // padded only clears "0" and "20"), too sparse to read a bar's height
+  // against the scale at a glance. A line chart keeps the default: its
+  // waypoint callouts already name specific values directly on the chart,
+  // so it doesn't lean on the axis the way an unlabeled-scale bar does.
+  const yStep = chooseYStep(yDomain, 5);
   const yTicks: number[] = [];
   for (let yv = Math.ceil(yDomain[0] / yStep) * yStep; yv <= yDomain[1]; yv += yStep) yTicks.push(yv);
   const zeroY = py(0, yDomain);
@@ -128,7 +155,10 @@ export const BarBody: React.FC<{
   // subtitle type scale. Pulled up close to the title block (was 470, right
   // on top of the x-axis row at 508/538) now that specs commonly drop the
   // subtitle -- leaves clear air above the month-tick row instead of the
-  // legend nearly touching it.
+  // legend nearly touching it. Fixed regardless of `topOffset`: it already
+  // sits close enough to the title block that raising it further risks
+  // crowding the title's own descenders -- `topOffset` only closes the
+  // (larger) gap between here and the tick row below.
   const LEGEND_Y = 390;
   const SWATCH = 30;
   let legendX = TEXTSAFE.x;
@@ -183,15 +213,15 @@ export const BarBody: React.FC<{
       <line x1={PLOT.left} y1={zeroY} x2={PLOT.right} y2={zeroY} stroke={palette.dim} strokeWidth={STROKE.tick} />
 
       {/* x-axis month ticks, above the plot per this repo's time-axis convention */}
-      <line x1={PLOT.left} y1={ROW.xaxisRule} x2={PLOT.right} y2={ROW.xaxisRule} stroke={palette.grid} strokeWidth={STROKE.grid} />
+      <line x1={PLOT.left} y1={xaxisRule} x2={PLOT.right} y2={xaxisRule} stroke={palette.grid} strokeWidth={STROKE.grid} />
       {groups.map((g, i) => {
         const cx = PLOT.left + (i + 0.5) * slotW;
         return (
           <React.Fragment key={`x-${i}`}>
-            <line x1={cx} y1={ROW.xaxisRule} x2={cx} y2={ROW.xaxisRule + ROW.xaxisTick} stroke={palette.grid} strokeWidth={STROKE.tick} />
+            <line x1={cx} y1={xaxisRule} x2={cx} y2={xaxisRule + ROW.xaxisTick} stroke={palette.grid} strokeWidth={STROKE.tick} />
             <text
               x={cx}
-              y={ROW.xaxisLabel}
+              y={xaxisLabel}
               fontSize={TYPE.axis.size}
               fontFamily={TYPE.axis.family}
               fontWeight={TYPE.axis.weight}

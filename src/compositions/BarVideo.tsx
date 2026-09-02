@@ -105,6 +105,11 @@ export const BarVideo: React.FC<BarSpec> = (spec) => {
 
   const title = spec.chrome?.title ?? primaryMeta.title;
   const subtitle = spec.chrome?.subtitle ?? primaryMeta.subtitle;
+  // No subtitle leaves a bare title with nothing under it until the tick
+  // row -- pull the tick row up to close most of that gap. A legend (2+
+  // series) already fills some of that space on its own, so it needs less
+  // closing than a single-series chart with nothing between title and axis.
+  const topOffset = subtitle ? 0 : spec.series.length >= 2 ? 50 : 90;
 
   return (
     <ChartChrome title={title} subtitle={subtitle} palette={palette} type={theme.type}>
@@ -119,6 +124,7 @@ export const BarVideo: React.FC<BarSpec> = (spec) => {
         type={theme.type}
         negativeColor={palette.accent}
         stacked={spec.stacked}
+        topOffset={topOffset}
       />
     </ChartChrome>
   );

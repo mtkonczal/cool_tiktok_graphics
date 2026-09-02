@@ -4,7 +4,7 @@
   "theme": "butter_on_espresso",
   "chrome": {
     "title": "Who gained jobs",
-    "subtitle": "Monthly nonfarm payroll change, by sex"
+    "subtitle": ""
   },
   "series": [
     { "ref": "men_change", "label": "Men" },

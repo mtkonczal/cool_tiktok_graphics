@@ -173,6 +173,10 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
 
   const title = spec.chrome?.title ?? (spec.series.length === 1 ? primaryMeta.title : undefined);
   const subtitle = spec.chrome?.subtitle ?? (spec.series.length === 1 ? primaryMeta.subtitle : undefined);
+  // No subtitle leaves a bare title with nothing under it until the tick
+  // row (LineVideo has no legend to fill that gap either way) -- pull the
+  // tick row up to close most of it.
+  const topOffset = subtitle ? 0 : 90;
 
   return (
     <ChartChrome title={title ?? spec.id} subtitle={subtitle} palette={palette} type={theme.type}>
@@ -189,6 +193,7 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
         latestSolid={theme.marks.latestSolid}
         waypoints={waypoints}
         annotations={annotations}
+        topOffset={topOffset}
       />
     </ChartChrome>
   );

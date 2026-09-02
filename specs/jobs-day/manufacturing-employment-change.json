@@ -4,7 +4,7 @@
   "theme": "butter_on_espresso",
   "chrome": {
     "title": "Manufacturing jobs",
-    "subtitle": "Monthly change in manufacturing payrolls"
+    "subtitle": ""
   },
   "series": [{ "ref": "manufacturing_change", "label": "Monthly change" }],
   "window": ["2025-12-01", "latest"],
