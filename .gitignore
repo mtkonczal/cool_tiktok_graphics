@@ -32,3 +32,10 @@ out/
 # + its .meta.json (already covered by the src/data/ carve-out above) is the
 # thing that's actually committed for provenance, same rule as everywhere else.
 jobs-day/data/
+
+# ── data/raw/: downloaded source files, not the vintage record ───────────
+# fetch.R's "bls_xlsx" source (labor_share) downloads a fresh BLS Excel
+# workbook into data/raw/ on every run, vintage-stamped by filename. Same
+# rule as jobs-day/data/ above: the workbook itself is intermediate input,
+# not the committed vintage -- src/data/labor_share.json + .meta.json is.
+data/raw/

@@ -17,6 +17,19 @@ export type BarGroup = {
   values: (number | null)[]; // one per series, same order as `seriesLabels`/`seriesColors`
 };
 
+// A "regime" bracket: a colored average-value callout spanning a contiguous
+// run of groups, e.g. "92k a month" over Jan-Apr. Index range is already in
+// groups-array space (BarVideo resolves each regime's own date window down
+// to group indices, same as it resolves the spec's own window) -- BarBody
+// only ever deals in group positions, never raw dates, so this stays
+// consistent with everything else in this file.
+export type BarRegime = {
+  i0: number; // first group index, inclusive
+  i1: number; // last group index, inclusive
+  label: string; // precomputed, e.g. "92k a month"
+  color: string; // resolved hex -- caller picks from the active palette
+};
+
 const MONTH_ABBR = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function monthGroupsFromSeries(dataByRef: DataRow[][], i0: number, i1: number): BarGroup[] {
@@ -52,6 +65,19 @@ export const BarBody: React.FC<{
    * chart's bars are already colored per-series (1st/2nd/3rd estimate) and
    * ignore this. Also ignored when `stacked` is true, for the same reason. */
   negativeColor?: string;
+  /** Per-group fill override, single-series only -- index-aligned with
+   * `groups`. When set for a given index, replaces both the series color
+   * and sign-coloring for that one bar (used for a "regime" chart's muted/
+   * excluded month, e.g. a bad print that still counts toward its era's
+   * average but shouldn't read as part of the "good" run). Ignored (like
+   * `negativeColor`) for 2+ series or `stacked`. */
+  barColors?: (string | undefined)[];
+  /** Regime brackets: colored average-value callouts drawn above the plot,
+   * each spanning a contiguous run of groups. Single-series only, and
+   * mutually exclusive in practice with `negativeColor`'s per-bar sign
+   * coloring -- a regime chart colors bars by era (via `barColors`, set by
+   * the caller alongside this), not by sign. */
+  regimes?: BarRegime[];
   /** When true (2+ series only -- a single series has nothing to stack),
    * draws one column per group instead of a side-by-side cluster: positive
    * values stack upward from zero in series order, negative values stack
@@ -90,6 +116,8 @@ export const BarBody: React.FC<{
   palette = PETROL,
   type = DEFAULT_TYPE,
   negativeColor,
+  barColors,
+  regimes,
   stacked = false,
   topOffset = 0,
 }) => {
@@ -305,7 +333,8 @@ export const BarBody: React.FC<{
               const top = Math.min(y, zeroY);
               const height = Math.abs(y - zeroY);
               const labelY = v >= 0 ? y - 14 : y + TYPE.value.size * 0.7;
-              const fill = signColored && v < 0 ? negativeColor! : seriesColors[si];
+              const barColorOverride = si === 0 ? barColors?.[gi] : undefined;
+              const fill = barColorOverride ?? (signColored && v < 0 ? negativeColor! : seriesColors[si]);
               return (
                 <React.Fragment key={`bar-${gi}-${si}`}>
                   <rect x={x} y={top} width={barW} height={height} fill={fill} rx={3} />
@@ -326,6 +355,46 @@ export const BarBody: React.FC<{
                 </React.Fragment>
               );
             })}
+          </g>
+        );
+      })}
+
+      {/* Regime brackets: colored average-value callout + underline spanning
+          a contiguous run of groups. Sits in the header gap between the
+          subtitle/legend row and PLOT.top -- a fixed layout position, not a
+          data-space one, so it doesn't drift if the y-domain rescales.
+          Fades in once its own last bar finishes growing, so it reads as
+          "this era just finished drawing" rather than being there from
+          frame 0 ahead of the bars it's summarizing. */}
+      {regimes?.map((r, ri) => {
+        const inset = slotW * 0.06;
+        const x1 = PLOT.left + r.i0 * slotW + inset;
+        const x2 = PLOT.left + (r.i1 + 1) * slotW - inset;
+        // Trigger is r.i1 (the last bar *starting* to grow), not r.i1 + 1
+        // (fully grown) -- revealProgress caps exactly at n once the reveal
+        // finishes, and for a regime whose i1 is the last group (n - 1),
+        // n === r.i1 + 1 exactly, which left this permanently at opacity 0
+        // for the entire hold (found by rendering the final frame: the
+        // second bracket never appeared). Triggering off r.i1 finishes
+        // fading in well before that cap is reached.
+        const opacity = Math.max(0, Math.min(1, (revealProgress - r.i1) / 0.3));
+        if (opacity <= 0) return null;
+        const LABEL_Y = 560;
+        const BAR_Y = 592;
+        return (
+          <g key={`regime-${ri}`} opacity={opacity}>
+            <line x1={x1} y1={BAR_Y} x2={x2} y2={BAR_Y} stroke={r.color} strokeWidth={STROKE.tick} strokeLinecap="round" />
+            <text
+              x={(x1 + x2) / 2}
+              y={LABEL_Y}
+              fontSize={TYPE.subtitle.size}
+              fontFamily={TYPE.value.family}
+              fontWeight={TYPE.value.weight}
+              fill={r.color}
+              textAnchor="middle"
+            >
+              {r.label}
+            </text>
           </g>
         );
       })}

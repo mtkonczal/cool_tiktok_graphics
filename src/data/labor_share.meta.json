@@ -1,0 +1,19 @@
+{
+  "name": "labor_share",
+  "source": "bls_xlsx",
+  "fetched_at": "2026-09-03T13:43:42Z",
+  "units": "percent",
+  "decimals": 1,
+  "row_count": 318,
+  "first_date": "1947-01-01",
+  "last_date": "2026-04-01",
+  "last_value": 52.8,
+  "bls_xlsx_url": "https://www.bls.gov/web/prod2/labor-productivity-major-sectors.xlsx",
+  "bls_xlsx_sheet": "MachineReadable",
+  "bls_xlsx_filters": {
+    "Sector": "Nonfarm business sector",
+    "Measure": "Labor share",
+    "Units": "Percentage"
+  },
+  "frequency": "quarterly"
+}

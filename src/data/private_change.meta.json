@@ -1,0 +1,15 @@
+{
+  "name": "private_change",
+  "source": "derived",
+  "fetched_at": "2026-09-04T00:16:03Z",
+  "units": "count",
+  "decimals": 0,
+  "row_count": 1051,
+  "first_date": "1939-01-01",
+  "last_date": "2026-07-01",
+  "last_value": 30,
+  "fred_inputs": {
+    "v": "USPRIV"
+  },
+  "expr": "v - dplyr::lag(v, 1)"
+}

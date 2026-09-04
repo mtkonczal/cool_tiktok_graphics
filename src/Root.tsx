@@ -2,8 +2,11 @@ import React from "react";
 import { Composition } from "remotion";
 import { LineVideo, LineSpec, calculateLineMetadata } from "./compositions/LineVideo";
 import { BarVideo, BarSpec, calculateBarMetadata } from "./compositions/BarVideo";
+import { CategoryBarVideo, CategoryBarSpec, calculateCategoryBarMetadata } from "./compositions/CategoryBarVideo";
 import { RipCardReveal, calculateRipCardMetadata } from "./RipCardReveal";
 import { ListReveal, TOTAL_FRAMES as LIST_TOTAL_FRAMES } from "./ListReveal";
+import { TitleCard, TitleCardProps } from "./TitleCard";
+import { Card, CardProps } from "./Card";
 
 const FPS = 30;
 
@@ -37,6 +40,19 @@ const STUDIO_DEFAULT_BAR_SPEC: BarSpec = {
   holdSeconds: 5,
 };
 
+const STUDIO_DEFAULT_CATEGORY_BAR_SPEC: CategoryBarSpec = {
+  id: "studio-default-category-bar",
+  type: "category-bar",
+  categories: [
+    { ref: "payrolls_change", label: "All jobs" },
+    { ref: "private_change", label: "Private sector" },
+    { ref: "leisure_change", label: "Leisure & hospitality" },
+    { ref: "local_gov_education_change", label: "Local gov't education" },
+  ],
+  revealSeconds: 3,
+  holdSeconds: 6,
+};
+
 export const RemotionRoot: React.FC = () => {
   return (
     <>
@@ -62,6 +78,19 @@ export const RemotionRoot: React.FC = () => {
         component={BarVideo}
         calculateMetadata={calculateBarMetadata}
         defaultProps={STUDIO_DEFAULT_BAR_SPEC}
+        durationInFrames={30}
+        fps={FPS}
+        width={1080}
+        height={1920}
+      />
+      {/* One generic category-diverging-bar shape, reused for every category
+          snapshot video -- see src/compositions/CategoryBarVideo.tsx. Same
+          --props-at-render-time pattern as LineVideo/BarVideo above. */}
+      <Composition
+        id="CategoryBarVideo"
+        component={CategoryBarVideo}
+        calculateMetadata={calculateCategoryBarMetadata}
+        defaultProps={STUDIO_DEFAULT_CATEGORY_BAR_SPEC}
         durationInFrames={30}
         fps={FPS}
         width={1080}
@@ -96,6 +125,45 @@ export const RemotionRoot: React.FC = () => {
         fps={FPS}
         width={1080}
         height={1920}
+      />
+      {/* Square (1080x1080) TikTok title/cover tile -- not part of the
+          vertical chart family, its own bespoke shape (CLAUDE.md Section 11
+          / "Title cards"). Fixed 2s duration. No eyebrow/dot by default; the
+          pop-in effect on whichever line popLine names is the one shipped
+          example -- expect to hand-edit TitleCardBody.tsx's animation for
+          the next card's own "cool little graphic thing" (see CLAUDE.md). */}
+      <Composition
+        id="TitleCard"
+        component={TitleCard}
+        defaultProps={
+          {
+            lines: ["Why you", "are", "squeezed:", "lowest labor", "share ever"],
+            popLine: 2,
+          } satisfies TitleCardProps
+        }
+        durationInFrames={60}
+        fps={FPS}
+        width={1080}
+        height={1080}
+      />
+      {/* Chapter card -- a smaller, transitional cousin of TitleCard: full
+          width, 16:9 banner instead of a full 1080x1080 reveal. Same corner
+          mark + bottom bar as TitleCard (src/cardPalette.ts), single-line
+          headline. See CLAUDE.md's Title cards section. */}
+      <Composition
+        id="Card"
+        component={Card}
+        defaultProps={
+          {
+            eyebrowText: "PART 02",
+            headline: "Corporate Power",
+            fontSize: 115,
+          } satisfies CardProps
+        }
+        durationInFrames={60}
+        fps={FPS}
+        width={1080}
+        height={608}
       />
     </>
   );

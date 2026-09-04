@@ -39,6 +39,12 @@ export const ChartChrome: React.FC<{
       >
         <rect width={FRAME.width} height={FRAME.height} fill={palette.bg} />
 
+        {/* A title with an embedded "\n" wraps onto stacked lines in the same
+            title font/size -- a literal, spec-author-chosen break (like
+            subtitle/subtitle2 below), not auto-measured word-wrap. Every
+            title before labor-share.json's "Labor Share Lowest on Record"
+            was short enough to fit TEXTSAFE.w on one line; this is the first
+            one long enough to run past it (found by rendering). */}
         <text
           x={TEXTSAFE.x}
           y={ROW.title}
@@ -48,7 +54,11 @@ export const ChartChrome: React.FC<{
           letterSpacing={TYPE.title.tracking}
           fill={palette.text}
         >
-          {title}
+          {title.split("\n").map((line, i) => (
+            <tspan key={i} x={TEXTSAFE.x} dy={i === 0 ? 0 : TYPE.title.size * (TYPE.title.lineHeight ?? 1.2)}>
+              {line}
+            </tspan>
+          ))}
         </text>
 
         {subtitle && (

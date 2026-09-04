@@ -175,10 +175,30 @@ export function svgAnchor(ha: HAlign): "start" | "middle" | "end" {
 }
 
 // x-axis year-label thinning: show every Nth year once the view gets wide
-// (mirrors the R/matplotlib/Manim zoom-out versions' tick-density rule)
-export function yearStep(xDomain: [number, number]): number {
-  const yearsVisible = (xDomain[1] - xDomain[0]) / 12;
-  return yearsVisible > 18 ? 5 : yearsVisible > 9 ? 2 : 1;
+// (mirrors the R/matplotlib/Manim zoom-out versions' tick-density rule).
+// Takes real calendar months visible, not a raw index span -- see
+// xAxisTicks below for why those two stopped being interchangeable once a
+// non-monthly series (labor_share, quarterly) existed.
+//
+// The >18-year tier topped out at a step of 5 with no further tier above it
+// until labor-share.json's full 1947-present window (~79 years) -- at step
+// 5 that's ~16 ticks, double the ~8-tick target every other tier aims for,
+// and dense enough that adjacent month+year labels visually collided
+// (found by rendering). The two new tiers below only engage above 45 and
+// 90 years -- comfortably past manufacturing-employment-level.json's 1990-
+// present window (~36.6 years, the widest window any spec used before
+// labor-share.json), so every existing spec still gets step 5, unchanged.
+export function yearStep(monthsVisible: number): number {
+  const yearsVisible = monthsVisible / 12;
+  return yearsVisible > 90 ? 20 : yearsVisible > 45 ? 10 : yearsVisible > 18 ? 5 : yearsVisible > 9 ? 2 : 1;
+}
+
+// Calendar months between two "YYYY-MM-DD" dates (b minus a), independent
+// of how many data rows separate them.
+function monthsBetween(a: string, b: string): number {
+  const ma = monthDate(a);
+  const mb = monthDate(b);
+  return (mb.year - ma.year) * 12 + (mb.month - ma.month);
 }
 
 const MONTH_ABBR = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -221,16 +241,26 @@ function yearLabel(year: number): string {
 // construction, so it'd just repeat "Jan" 5-8 times) -- see anchorMonth
 // below.
 export function xAxisTicks(data: DataRow[], iLo: number, iHi: number): AxisTick[] {
-  const monthsVisible = iHi - iLo;
+  // Calendar months per row -- 1 for every series before labor_share (all
+  // monthly, where index-diff and months-visible were always the same
+  // number), 3 for a quarterly series. `monthsVisible` below is computed
+  // from real dates so tick density is right regardless of row spacing;
+  // `stepIdx` converts the chosen calendar-month step back into a row-index
+  // step. For a monthly series stepIdx == stepMonths exactly, so this is a
+  // no-op generalization -- byte-identical output to the pre-labor_share
+  // version.
+  const rowMonths = data.length > 1 ? monthsBetween(data[0].date, data[1].date) : 1;
+  const monthsVisible = monthsBetween(data[iLo].date, data[iHi].date);
   const anchorMonth = monthDate(data[iHi].date).month;
 
   const stepMonths =
     monthsVisible > 30
-      ? yearStep([iLo, iHi]) * 12
+      ? yearStep(monthsVisible) * 12
       : [1, 2, 3, 6].find((s) => Math.ceil(monthsVisible / s) + 1 <= 8) ?? 6;
+  const stepIdx = Math.max(1, Math.round(stepMonths / rowMonths));
 
   const idxs: number[] = [];
-  for (let i = iHi; i >= iLo; i -= stepMonths) idxs.push(i);
+  for (let i = iHi; i >= iLo; i -= stepIdx) idxs.push(i);
   idxs.reverse();
 
   const bareYear = monthsVisible > 30 && anchorMonth === 1;

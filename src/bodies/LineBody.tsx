@@ -106,8 +106,23 @@ export const LineBody: React.FC<{
   const primary = series[0].data;
   // Dot marks and label text shrink with zoom the same way waypoints do --
   // shared across both series-count branches since hline/vline/point labels
-  // render regardless of which one is active.
-  const textZoom = Math.min(zoomFactor, MAX_LABEL_SHRINK);
+  // render regardless of which one is active. `zoomFactor` was >= 1 for
+  // every spec until labor-share.json: every prior spec's first shot is its
+  // narrowest window, so later zooms only ever widen the view (zoomFactor
+  // grows). labor-share.json's first shot is instead the full 1947-present
+  // history -- its widest possible view -- with later shots zooming IN, so
+  // markZoom legitimately drops below 1. Every mark/label size below was
+  // written as `X / markZoom`, uncapped on the low end (only
+  // MAX_LABEL_SHRINK capped the high end), so a sub-1 zoomFactor blew these
+  // up without bound -- e.g. a waypoint dot several hundred px across.
+  // markZoom floors zoomFactor at 1 for exactly this case: a view zoomed in
+  // tighter than the first shot's own window keeps that first shot's mark/
+  // text size instead of growing further, rather than being reasoned about
+  // from scratch. A no-op for every existing spec (zoomFactor was already
+  // >= 1 there), so their rendered output is unchanged -- verified by
+  // rendering prime-epop-zoomout.json before/after: byte-identical.
+  const markZoom = Math.max(zoomFactor, 1);
+  const textZoom = Math.min(markZoom, MAX_LABEL_SHRINK);
   const yStep = chooseYStep(yDomain);
   const yTicks: number[] = [];
   for (let yv = Math.ceil(yDomain[0] / yStep) * yStep; yv <= yDomain[1]; yv += yStep) yTicks.push(yv);
@@ -278,9 +293,9 @@ export const LineBody: React.FC<{
     const anchor = svgAnchor(haFor(p.idx, xDomain));
     return (
       <g key={`point-${i}`} opacity={p.opacity}>
-        <circle cx={cx} cy={cy} r={MARK.waypoint / zoomFactor} fill={palette.accent} />
-        <circle cx={cx} cy={cy} r={MARK.waypointCore / zoomFactor} fill={palette.bg} />
-        <line x1={cx} y1={cy - MARK.waypoint / zoomFactor} x2={cx} y2={cy - POINT_LEADER} stroke={palette.dim} strokeWidth={STROKE.tick} />
+        <circle cx={cx} cy={cy} r={MARK.waypoint / markZoom} fill={palette.accent} />
+        <circle cx={cx} cy={cy} r={MARK.waypointCore / markZoom} fill={palette.bg} />
+        <line x1={cx} y1={cy - MARK.waypoint / markZoom} x2={cx} y2={cy - POINT_LEADER} stroke={palette.dim} strokeWidth={STROKE.tick} />
         <text
           x={cx}
           y={cy - POINT_LEADER - 10}
@@ -336,8 +351,8 @@ export const LineBody: React.FC<{
         {/* leading edge, only while the line is still drawing */}
         {tipVal && !atLatest && (
           <>
-            <circle cx={px(tipVal[0], xDomain)} cy={py(tipVal[1], yDomain)} r={(MARK.waypoint + 2) / zoomFactor} fill={palette.series} />
-            <circle cx={px(tipVal[0], xDomain)} cy={py(tipVal[1], yDomain)} r={MARK.waypointCore / zoomFactor} fill={palette.bg} />
+            <circle cx={px(tipVal[0], xDomain)} cy={py(tipVal[1], yDomain)} r={(MARK.waypoint + 2) / markZoom} fill={palette.series} />
+            <circle cx={px(tipVal[0], xDomain)} cy={py(tipVal[1], yDomain)} r={MARK.waypointCore / markZoom} fill={palette.bg} />
           </>
         )}
 
@@ -391,7 +406,7 @@ export const LineBody: React.FC<{
           // (found by rendering unrate_bls's "latest" point, inline mode, right
           // at the dot). Not needed for the "above" (headroom) position -- that
           // one is already far enough above the dot vertically.
-          const DOT_PAD = MARK.waypoint / zoomFactor + 8 * PAD_SCALE;
+          const DOT_PAD = MARK.waypoint / markZoom + 8 * PAD_SCALE;
           const laidOut = visible.map((wp) => {
             const cx = px(wp.idx, xDomain);
             const anchor = svgAnchor(haFor(wp.idx, xDomain));
@@ -618,15 +633,15 @@ export const LineBody: React.FC<{
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={(MARK.waypoint + 3) / zoomFactor}
+                    r={(MARK.waypoint + 3) / markZoom}
                     fill={palette.accent}
                     stroke={palette.bg}
-                    strokeWidth={7 / zoomFactor}
+                    strokeWidth={7 / markZoom}
                   />
                 ) : (
                   <>
-                    <circle cx={cx} cy={cy} r={MARK.waypoint / zoomFactor} fill={isLatest ? palette.accent : palette.series} />
-                    <circle cx={cx} cy={cy} r={MARK.waypointCore / zoomFactor} fill={palette.bg} />
+                    <circle cx={cx} cy={cy} r={MARK.waypoint / markZoom} fill={isLatest ? palette.accent : palette.series} />
+                    <circle cx={cx} cy={cy} r={MARK.waypointCore / markZoom} fill={palette.bg} />
                   </>
                 )}
                 {labelNodes}

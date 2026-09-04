@@ -1,0 +1,19 @@
+{
+  "id": "labor-share-since-2023",
+  "theme": "butter_on_espresso",
+  "chrome": {
+    "title": "Labor Share\nLowest on Record",
+    "subtitle": ""
+  },
+  "series": [{ "ref": "labor_share" }],
+  "window": ["2023-01-01", "latest"],
+  "waypoints": ["latest"],
+  "waypointAnchor": "point",
+  "waypointHideDate": ["latest"],
+  "waypointBesideDot": ["latest"],
+  "annotations": [{ "kind": "band", "window": ["2024-01-01", "2024-10-01"], "label": "2024" }],
+  "shots": [
+    { "kind": "draw", "seconds": 2.0, "window": ["2023-01-01", "latest"] },
+    { "kind": "hold", "seconds": 5.0 }
+  ]
+}

@@ -118,6 +118,8 @@ function main() {
     validateSequence(spec, file);
   } else if (spec.type === "bar") {
     validateBarSpec(spec, file);
+  } else if (spec.type === "category-bar") {
+    validateCategoryBarSpec(spec, file);
   } else {
     validateLineSpec(spec, file);
   }
@@ -206,6 +208,68 @@ function validateBarSpec(spec, file) {
     fail("window: required [start, end]");
   } else {
     checkWindow(spec.window, "window", { allowRelative: false });
+  }
+
+  if (!isNumber(spec.revealSeconds) || spec.revealSeconds <= 0) fail("revealSeconds: required positive number");
+  if (!isNumber(spec.holdSeconds) || spec.holdSeconds <= 0) fail("holdSeconds: required positive number");
+
+  const REGIME_COLORS = ["series", "accent", "seriesAlt"];
+  if (spec.regimes !== undefined) {
+    if (spec.series?.length !== 1) fail("regimes: only valid for a single-series bar spec");
+    if (!Array.isArray(spec.regimes) || spec.regimes.length === 0) {
+      fail("regimes: must be a non-empty array");
+    } else {
+      spec.regimes.forEach((r, i) => {
+        if (!isPlainObject(r)) {
+          fail(`regimes[${i}]: must be an object`);
+          return;
+        }
+        checkWindow(r.window, `regimes[${i}].window`, { allowRelative: false });
+        if (!REGIME_COLORS.includes(r.color)) {
+          fail(`regimes[${i}].color: must be one of ${REGIME_COLORS.join("/")}`);
+        }
+        if (!isString(r.suffix)) fail(`regimes[${i}].suffix: required string`);
+      });
+    }
+  }
+  if (spec.muteDates !== undefined) {
+    if (!Array.isArray(spec.muteDates) || !spec.muteDates.every(isString)) {
+      fail("muteDates: must be an array of date strings");
+    }
+  }
+}
+
+function validateCategoryBarSpec(spec, file) {
+  const registry = JSON.parse(readFileSync(path.join(REPO_ROOT, "data", "series.json"), "utf8"));
+
+  if (!isString(spec.id)) fail("id: required string");
+
+  if (!Array.isArray(spec.categories) || spec.categories.length < 2 || spec.categories.length > 6) {
+    fail("categories: required array of 2-6 { ref, label }");
+  } else {
+    spec.categories.forEach((c, i) => {
+      if (!isPlainObject(c) || !isString(c.ref) || !isString(c.label)) {
+        fail(`categories[${i}]: must be an object { "ref": string, "label": string }`);
+      } else if (!(c.ref in registry)) {
+        fail(`categories[${i}].ref: "${c.ref}" is not in data/series.json`);
+      }
+    });
+  }
+
+  if (spec.chrome !== undefined) {
+    if (!isPlainObject(spec.chrome)) fail("chrome: must be an object");
+    else {
+      if (spec.chrome.title !== undefined && !isString(spec.chrome.title)) fail("chrome.title: must be a string");
+      if (spec.chrome.subtitle !== undefined && !isString(spec.chrome.subtitle)) fail("chrome.subtitle: must be a string");
+    }
+  }
+
+  if (spec.palette !== undefined && spec.palette !== "petrol" && spec.palette !== "paper") {
+    fail(`palette: must be "petrol" or "paper", got ${JSON.stringify(spec.palette)}`);
+  }
+
+  if (spec.theme !== undefined && !THEME_IDS.includes(spec.theme)) {
+    fail(`theme: "${spec.theme}" is not a known theme (have: ${THEME_IDS.join(", ")})`);
   }
 
   if (!isNumber(spec.revealSeconds) || spec.revealSeconds <= 0) fail("revealSeconds: required positive number");

@@ -34,6 +34,7 @@ cd "$REPO_ROOT"
 spec_refs() {
   local f="$1"
   jq -r '.series[]?.ref // empty' "$f"
+  jq -r '.categories[]?.ref // empty' "$f"
   if jq -e '(.annotations // []) | index("recessions")' "$f" >/dev/null 2>&1; then
     echo "recessions"
   fi
@@ -105,7 +106,15 @@ render_spec() {
   local id out composition
   id=$(jq -r '.id' "$spec_file")
   out=$(dated_out_path "$id" "$spec_file")
-  composition=$([[ "$(jq -r '.type // empty' "$spec_file")" == "bar" ]] && echo "BarVideo" || echo "LineVideo")
+  local spec_type
+  spec_type=$(jq -r '.type // empty' "$spec_file")
+  if [[ "$spec_type" == "bar" ]]; then
+    composition="BarVideo"
+  elif [[ "$spec_type" == "category-bar" ]]; then
+    composition="CategoryBarVideo"
+  else
+    composition="LineVideo"
+  fi
   mkdir -p "$(dirname "$out")"
   echo "Rendering ${id} (${composition}) -> ${out}"
   npx remotion render src/index.ts "$composition" "$out" --props="$spec_file"

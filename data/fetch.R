@@ -14,6 +14,7 @@ suppressPackageStartupMessages({
   library(tidyusmacro)
   library(jsonlite)
   library(blsR)
+  library(readxl)
 })
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -40,7 +41,12 @@ is_stale <- function(meta_path, max_age_days = 7) {
   age > max_age_days
 }
 
-sanity_check <- function(name, df) {
+# `frequency` gates the expected gap between consecutive dates -- "monthly"
+# (default, every series before labor_share) expects 27-32 days; "quarterly"
+# expects 85-95 days (calendar quarters run 90-92 days, plus slack for
+# 28/29-day Februaries). Passed through from spec$frequency so a new
+# non-monthly series doesn't have to fight this check to get fetched.
+sanity_check <- function(name, df, frequency = "monthly") {
   d <- df$date
   if (is.unsorted(d, strictly = TRUE)) {
     stop(name, ": dates are not strictly increasing")
@@ -49,25 +55,28 @@ sanity_check <- function(name, df) {
     stop(name, ": duplicate dates found")
   }
   gaps <- as.numeric(diff(d))
-  if (any(gaps < 27 | gaps > 32)) {
-    stop(name, ": non-monthly cadence detected (gap outside 27-32 days)")
+  gap_bounds <- if (frequency == "quarterly") c(85, 95) else c(27, 32)
+  if (any(gaps < gap_bounds[1] | gaps > gap_bounds[2])) {
+    stop(name, sprintf(": non-%s cadence detected (gap outside %d-%d days)", frequency, gap_bounds[1], gap_bounds[2]))
   }
 
   v <- df$value
   present <- !is.na(v)
   if (!any(present)) stop(name, ": every value is NA")
 
+  trailing_n <- if (frequency == "quarterly") 4 else 12
+  min_window <- if (frequency == "quarterly") 3 else 6
   last_present_idx <- max(which(present))
-  window <- v[max(1, last_present_idx - 12):(last_present_idx - 1)]
+  window <- v[max(1, last_present_idx - trailing_n):(last_present_idx - 1)]
   window <- window[!is.na(window)]
-  if (length(window) >= 6) {
+  if (length(window) >= min_window) {
     mu <- mean(window)
     sigma <- stats::sd(window)
     last_val <- v[last_present_idx]
     if (sigma > 0 && abs(last_val - mu) > 3 * sigma) {
       message(sprintf(
-        "  WARN %s: last value %.4f is > 3 SD from the trailing-12-month mean %.4f (sd %.4f) — real, or a bad pull?",
-        name, last_val, mu, sigma
+        "  WARN %s: last value %.4f is > 3 SD from the trailing-%d-period mean %.4f (sd %.4f) — real, or a bad pull?",
+        name, last_val, trailing_n, mu, sigma
       ))
     }
   }
@@ -131,6 +140,46 @@ fetch_one <- function(name, spec) {
       stop(name, ": field '", field, "' not found in ", csv_path)
     }
     df <- data.frame(date = as.Date(rev$date), value = as.numeric(rev[[field]]))
+  } else if (spec$source == "bls_xlsx") {
+    # A BLS news-release backup Excel table, not the pub/time.series flat-file
+    # API -- for data that only exists in a release's Excel workbook (e.g.
+    # labor share as an actual percentage, not the 2017=100 index the flat
+    # file carries). Downloads the workbook fresh every run (vintage-stamped
+    # under data/raw/, mirroring command_line_AI_projects/
+    # productivity_prices_labor_share/06_labor_share_twitter.R's own pull),
+    # reads one sheet, and keeps rows matching every name/value pair in
+    # `filters` exactly. `date` is built from that sheet's Year/Qtr columns
+    # -- this branch is quarterly-shaped by construction, not generic to any
+    # cadence a future bls_xlsx series might have.
+    raw_dir <- "data/raw"
+    dir.create(raw_dir, showWarnings = FALSE, recursive = TRUE)
+    dest <- file.path(raw_dir, sprintf("%s_%s.xlsx", name, format(Sys.Date(), "%Y-%m-%d")))
+    message("  downloading ", spec$url)
+    resp <- httr::GET(
+      spec$url,
+      httr::user_agent("mike@economicsecurityproject.org research (cool_tiktok_graphics bls_xlsx pull)"),
+      httr::write_disk(dest, overwrite = TRUE)
+    )
+    httr::stop_for_status(resp)
+
+    sheet_df <- as.data.frame(read_excel(dest, sheet = spec$sheet, col_types = "text"))
+    sheet_df$Year <- as.integer(sheet_df$Year)
+    sheet_df$Qtr <- suppressWarnings(as.integer(sheet_df$Qtr))
+    sheet_df$Value <- as.numeric(sheet_df$Value)
+
+    keep <- !is.na(sheet_df$Qtr)
+    for (col in names(spec$filters)) {
+      keep <- keep & !is.na(sheet_df[[col]]) & sheet_df[[col]] == spec$filters[[col]]
+    }
+    filtered <- sheet_df[keep, ]
+    if (nrow(filtered) == 0) {
+      stop(name, ": no rows matched filters ", toJSON(spec$filters, auto_unbox = TRUE), " in sheet '", spec$sheet, "' of ", dest)
+    }
+
+    df <- data.frame(
+      date = as.Date(sprintf("%d-%02d-01", filtered$Year, (filtered$Qtr - 1) * 3 + 1)),
+      value = filtered$Value
+    )
   } else {
     stop(name, ": unknown source '", spec$source, "'")
   }
@@ -141,7 +190,7 @@ fetch_one <- function(name, spec) {
     df$value <- round(df$value, decimals)
   }
 
-  sanity_check(name, df)
+  sanity_check(name, df, spec$frequency %||% "monthly")
 
   rows <- lapply(seq_len(nrow(df)), function(i) {
     list(date = format(df$date[i], "%Y-%m-%d"), value = if (is.na(df$value[i])) NULL else df$value[i])
@@ -171,7 +220,12 @@ fetch_one <- function(name, spec) {
   } else if (spec$source == "bls_scrape") {
     meta$bls_scrape_field <- spec$field
     meta$bls_scrape_csv <- spec$csv %||% "jobs-day/data/bls_ces_monthly_revisions.csv"
+  } else if (spec$source == "bls_xlsx") {
+    meta$bls_xlsx_url <- spec$url
+    meta$bls_xlsx_sheet <- spec$sheet
+    meta$bls_xlsx_filters <- spec$filters
   }
+  if (!is.null(spec$frequency)) meta$frequency <- spec$frequency
   write(toJSON(meta, auto_unbox = TRUE, null = "null", digits = NA, pretty = TRUE), meta_path)
 
   message(sprintf("  wrote %d rows, %s to %s (last value %s on %s)",

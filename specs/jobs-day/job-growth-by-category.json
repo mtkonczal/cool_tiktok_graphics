@@ -1,0 +1,13 @@
+{
+  "id": "jobs-day-job-growth-by-category",
+  "type": "category-bar",
+  "theme": "butter_on_espresso",
+  "categories": [
+    { "ref": "payrolls_change", "label": "All jobs" },
+    { "ref": "private_change", "label": "Private sector" },
+    { "ref": "leisure_change", "label": "Leisure & hospitality" },
+    { "ref": "local_gov_education_change", "label": "Local gov't education" }
+  ],
+  "revealSeconds": 3.0,
+  "holdSeconds": 6.0
+}

@@ -3,7 +3,7 @@ import { useCurrentFrame } from "remotion";
 import type { CalculateMetadataFunction } from "remotion";
 import "../fonts";
 import { ChartChrome } from "../ChartChrome";
-import { BarBody, monthGroupsFromSeries } from "../bodies/BarBody";
+import { BarBody, BarRegime, monthGroupsFromSeries } from "../bodies/BarBody";
 import { alignToGrid, ease } from "../engine/scales";
 import { resolveIndex } from "../engine/waypoints";
 import { seriesData } from "../data/registry";
@@ -55,6 +55,28 @@ export type BarSpec = {
    * this range. No relative tokens: a bar spec's window IS what's on screen,
    * there is no separate zoomed/panned view like a line spec's shots have. */
   window: [string, string];
+  /** Single-series only, mutually exclusive with sign-coloring (BarBody's
+   * `negativeColor` path is skipped when this is set): colors each bar by
+   * which era/regime its date falls in, rather than by its own sign, and
+   * draws a colored average-value bracket above the plot for each one. Each
+   * regime's average is computed fresh at render time over its own date
+   * window (literal dates or "latest" for the open-ended end), so it stays
+   * right as new months arrive -- same self-correcting idea as a LineSpec
+   * hline's "mean:TOKEN..TOKEN" (CLAUDE.md Section 6), just for a bar chart.
+   * Regimes should cover the spec's full window with no gaps; a date not
+   * covered by any regime keeps the ordinary series color. */
+  regimes?: {
+    window: [string, string];
+    /** Which palette color this era's bars + bracket use. */
+    color: "series" | "accent" | "seriesAlt";
+    /** Suffix after the computed average, e.g. "92k" + " a month". */
+    suffix: string;
+  }[];
+  /** Dates (within a regime) to render in a muted neutral color instead of
+   * their regime's color -- e.g. a single bad print that would otherwise
+   * look like part of a "good" run. Still counted in that regime's own
+   * average; this only changes the bar's fill. */
+  muteDates?: string[];
   /** Total time to reveal every group, left to right. */
   revealSeconds: number;
   /** Time to hold on the fully-revealed chart before the video ends. */
@@ -103,6 +125,42 @@ export const BarVideo: React.FC<BarSpec> = (spec) => {
 
   const seriesColors = [palette.series, palette.seriesAlt, palette.accent];
 
+  // Regimes: resolve each one's own date window down to group-array indices
+  // (groups[0] is spec.window[0], i.e. raw index i0), compute its average
+  // over the raw data (including any muted date -- muting only changes a
+  // bar's color, not the math), and build the per-bar color override array
+  // BarBody actually draws from.
+  const resolvedRegimes: BarRegime[] | undefined = spec.regimes?.map((r) => {
+    const rawI0 = resolveIndex(primaryData, r.window[0], { i0, i1 });
+    const rawI1 = resolveIndex(primaryData, r.window[1], { i0, i1 });
+    let sum = 0;
+    let count = 0;
+    for (let idx = rawI0; idx <= rawI1; idx++) {
+      const v = primaryData[idx]?.value;
+      if (v !== null && v !== undefined) {
+        sum += v;
+        count++;
+      }
+    }
+    const avg = count > 0 ? Math.round(sum / count) : 0;
+    return {
+      i0: rawI0 - i0,
+      i1: rawI1 - i0,
+      label: `${avg}k ${r.suffix}`,
+      color: palette[r.color],
+    };
+  });
+
+  const muteDateSet = new Set(spec.muteDates ?? []);
+  const barColors: (string | undefined)[] | undefined = resolvedRegimes
+    ? groups.map((_, gi) => {
+        const rawIdx = gi + i0;
+        if (muteDateSet.has(primaryData[rawIdx].date)) return palette.dim;
+        const regime = resolvedRegimes.find((r) => gi >= r.i0 && gi <= r.i1);
+        return regime?.color;
+      })
+    : undefined;
+
   const title = spec.chrome?.title ?? primaryMeta.title;
   const subtitle = spec.chrome?.subtitle ?? primaryMeta.subtitle;
   // No subtitle leaves a bare title with nothing under it until the tick
@@ -123,6 +181,8 @@ export const BarVideo: React.FC<BarSpec> = (spec) => {
         palette={palette}
         type={theme.type}
         negativeColor={palette.accent}
+        barColors={barColors}
+        regimes={resolvedRegimes}
         stacked={spec.stacked}
         topOffset={topOffset}
       />

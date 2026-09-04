@@ -173,10 +173,17 @@ export const LineVideo: React.FC<LineSpec> = (spec) => {
 
   const title = spec.chrome?.title ?? (spec.series.length === 1 ? primaryMeta.title : undefined);
   const subtitle = spec.chrome?.subtitle ?? (spec.series.length === 1 ? primaryMeta.subtitle : undefined);
+  const titleLines = (title ?? spec.id).split("\n").length;
   // No subtitle leaves a bare title with nothing under it until the tick
   // row (LineVideo has no legend to fill that gap either way) -- pull the
-  // tick row up to close most of it.
-  const topOffset = subtitle ? 0 : 90;
+  // tick row up to close most of it. A wrapped 2-line title (ChartChrome's
+  // "\n" support) needs the opposite adjustment -- push the tick row back
+  // down by the extra line's own height, since it now occupies the space
+  // this 90px pull-up assumed was empty. Net effect for a wrapped title
+  // with no subtitle (labor-share.json's case): the two roughly cancel out,
+  // landing close to the original unadjusted row position.
+  const topOffset =
+    (subtitle ? 0 : 90) - (titleLines - 1) * theme.type.title.size * (theme.type.title.lineHeight ?? 1.2);
 
   return (
     <ChartChrome title={title ?? spec.id} subtitle={subtitle} palette={palette} type={theme.type}>

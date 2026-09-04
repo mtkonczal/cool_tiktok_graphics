@@ -1,0 +1,23 @@
+{
+  "id": "labor-share",
+  "theme": "butter_on_espresso",
+  "chrome": {
+    "title": "Labor Share\nLowest on Record",
+    "subtitle": ""
+  },
+  "series": [{ "ref": "labor_share" }],
+  "window": ["1947-01-01", "latest"],
+  "waypoints": ["max", "latest"],
+  "waypointAnchor": "point",
+  "waypointHideDate": ["latest"],
+  "waypointBesideDot": ["latest"],
+  "annotations": ["recessions"],
+  "shots": [
+    { "kind": "draw", "seconds": 3.0, "window": ["1947-01-01", "latest"] },
+    { "kind": "hold", "seconds": 5.0 },
+    { "kind": "zoom", "seconds": 3.0, "window": ["1999-01-01", "latest"] },
+    { "kind": "hold", "seconds": 4.0 },
+    { "kind": "zoom", "seconds": 2.0, "window": ["2019-01-01", "latest"] },
+    { "kind": "hold", "seconds": 10.0 }
+  ]
+}

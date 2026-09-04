@@ -568,6 +568,95 @@ validator) — a spec with no `"type"` at all is still assumed to be a
 `LineSpec`, unchanged from before `BarVideo` existed. The composition itself
 still needs registering in `src/Root.tsx` the normal Remotion way.
 
+**`regimes`/`muteDates` (single-series `BarSpec` only)**: colors each bar by
+which date-range "era" it falls in instead of by its own sign, and draws a
+colored average-value bracket above the plot for each era — built for
+Jobs Day's "taper" chart (`specs/jobs-day/monthly-job-growth-taper.json`):
+Jan-Apr 2026 averaging ~92k/month (butter yellow) vs. May-latest averaging
+~20k/month (hot orange), with February's -156k print muted gray (still
+counted in its era's average — a real 156k-job-loss month is never allowed
+to just disappear or read as part of the "good" run) rather than colored
+like either era.
+
+```jsonc
+"regimes": [
+  { "window": ["2026-01-01", "2026-04-01"], "color": "series", "suffix": "a month" },
+  { "window": ["2026-05-01", "latest"], "color": "accent", "suffix": "a month" }
+],
+"muteDates": ["2026-02-01"]
+```
+
+Each regime's average is computed fresh at render time over its own
+`window` (literal dates or `"latest"` for an open-ended end) — the same
+self-correcting idea as a `LineSpec` hline's `"mean:TOKEN..TOKEN"` (Section
+6), so a new month's release both extends the chart *and* recomputes
+whichever era's bracket now includes it, with no spec edit required.
+Regimes should cover the spec's full `window` with no gaps. Resolution
+happens in `BarVideo.tsx` (date windows → group-array indices → averages →
+resolved hex colors); `BarBody.tsx` only ever takes the already-resolved
+`{i0, i1, label, color}` shape (`BarRegime`) plus a parallel `barColors`
+override array — it stays agnostic of "regime" as a concept, the same way
+it doesn't know what a line chart's waypoint is.
+
+One real bug worth knowing if you touch this: a regime's bracket fades in
+based on `revealProgress` crossing its own `i1` — **not** `i1 + 1` (fully
+grown). `revealProgress` caps at exactly `n` once the reveal finishes, and
+for whichever regime's `i1` is the *last* group, `n === i1 + 1` exactly —
+triggering on `i1 + 1` left that bracket at opacity 0 forever (found by
+rendering the final held frame: the second bracket, "20k a month", never
+appeared, through the entire hold). Triggering on `i1` finishes the fade-in
+before that cap is reached, for every regime, trailing one included.
+
+## 13. Category snapshots (`CategoryBarVideo`)
+
+A second bespoke-`.tsx` escape hatch, for a shape `BarBody` genuinely can't
+draw either: one horizontal bar per *named category* (not per time period),
+diverging left/right from a shared zero line, revealed top to bottom —
+"how did different parts of the economy do this release," not a time
+series. Built for Jobs Day's category-breakdown chart
+(`specs/jobs-day/job-growth-by-category.json`), ported from
+`BLS-CPS-Jobs-Numbers/14_tiktok_verticals.R`'s `make_g1`/"GRAPHIC 1." Same
+`ChartChrome` wrapper as every other composition here; `CategoryBarBody.tsx`
+is its own file because the x-scale (a signed value domain with asymmetric
+left/right padding, sized once from every category's own value) and the
+top-to-bottom reveal are both a different mechanism from `BarBody`'s
+date-indexed slots and left-to-right sweep — not two dials on one component.
+
+```jsonc
+{
+  "id": "jobs-day-job-growth-by-category",
+  "type": "category-bar",                  // required -- switches make.sh/Root.tsx/the validator
+  "theme": "butter_on_espresso",            // optional, same theme field every composition shares
+  "categories": [                           // required, 2-6 entries, top to bottom in this order
+    { "ref": "payrolls_change", "label": "All jobs" },
+    { "ref": "private_change", "label": "Private sector" },
+    { "ref": "leisure_change", "label": "Leisure & hospitality" },
+    { "ref": "local_gov_education_change", "label": "Local gov't education" }
+  ],
+  "revealSeconds": 3.0,                     // required -- total time to reveal every row, top to bottom
+  "holdSeconds": 6.0                        // required
+}
+```
+
+**Each category is a series ref, not a literal number** — resolved to its
+own latest value at render time (`CategoryBarVideo.tsx`), same
+never-hardcode-a-number-that-goes-stale principle as everything else here.
+The chart's title also auto-generates from the first category's own latest
+date ("Job Growth, {Month} {Year}") when `chrome.title` is omitted.
+
+**The categories themselves are expected to change release to release** —
+unlike a `BarSpec`'s series (which name a fixed thing being tracked over
+time), a category snapshot's whole point is picking whichever 3-4 categories
+tell that month's story, so don't treat the categories list above as
+settled just because it's what's currently in
+`job-growth-by-category.json`. Swapping in a different category needs its
+own registry entry first (Section 3) if it isn't already fetched — the
+three added alongside this feature (`private_change`/FRED `USPRIV`,
+`leisure_change`/FRED `USLAH`, `local_gov_education_change`/FRED
+`CES9093161101`) were themselves sourced by checking
+`BLS-CPS-Jobs-Numbers/14_tiktok_verticals.R` for the canonical series IDs
+already in use there, not guessed.
+
 ## 13. Themes (`src/themes/`)
 
 A **theme** is a swappable visual design for `LineVideo`/`LineBody`: palette,
@@ -654,3 +743,56 @@ disc with a thin bg-colored border instead, via a single `<circle>` with
 dot still uses — a deliberate different construction for a design that
 wants the endpoint to read as a punched-in dot, not another ring in the
 same family as the peak's.
+
+## 14. Title cards (`TitleCard`)
+
+When Mike says "title card" (or asks for a cover tile / cover graphic for a
+TikTok), this is the composition: `src/TitleCard.tsx` + `src/TitleCardBody.tsx`,
+a bespoke square (1080×1080) shape, not part of the vertical chart family —
+same "genuinely new shape gets its own file" reasoning as Section 11 and the
+`BarVideo` note in Section 12.
+
+**Fixed base template, established 2026-09-03** (all values live in
+`TitleCardBody.tsx`):
+
+- 1080×1080, 2 seconds (60 frames @ 30fps) — has been enough for every title
+  card so far; revisit only if a request needs more time to land.
+- Background: solid warm near-black `#191510`. No gradient, no texture.
+- Headline: up to 5 hard-broken lines (`lines` prop, exactly 5 — pad with
+  empty strings if a card needs fewer), Playfair Display **800** (the only
+  weight self-hosted in `public/fonts/` — "Bold" in a brief means this,
+  unless a true 700 file gets added), 140px, line-height 0.96, letter-
+  spacing −0.02em, left-aligned, anchored 108px from the left and 118px from
+  the bottom. Off-white `#f7f3ea` by default.
+- Accent bar: 172×8px, `#ff6b35`, left-aligned to the headline, 54px below it.
+- Eyebrow (dot + "EP. NN"): **optional, off by default.** Only pass
+  `episodeNumber` when a card actually wants episode numbering back — as of
+  this section's writing, none do.
+
+**What's genuinely reusable vs. what isn't**: the layout above (background,
+headline position/type, accent bar, optional eyebrow) is the stable part —
+render any new title card by passing new `lines` through the existing
+`TitleCard` composition, don't redo the geometry. The animated "cool little
+graphic thing" (the `squeezed:` pop-in — scale + opacity spring on one line,
+via `popLine`) is **not** a general effects system and isn't meant to become
+one. Mike will describe a different one-off effect per card (a word popping
+in was the first; expect wipes, shakes, letter-by-letter reveals, color
+cycles, etc. later) — the right move each time is to hand-edit the animation
+portion of `TitleCardBody.tsx` for that specific render, not to keep adding
+generic props to cover every possible effect. Re-engineering that part per
+card is the deliberate design, not a gap to fix.
+
+**Output**: title cards render into `out/titlecard/`, dated the same way as
+everything else — `out/titlecard/YYYY-MM-DD-<slug>.mp4`. They're one-off
+bespoke renders (no `specs/*.json` file, same as `RipCardReveal`/`ListReveal`
+in Section 9) — render directly:
+
+```bash
+mkdir -p out/titlecard
+npx remotion render src/index.ts TitleCard \
+  out/titlecard/$(date +%Y-%m-%d)-<slug>.mp4 \
+  --props='{"lines":["...","...","...","...","..."],"popLine":2}'
+```
+
+Still render-and-look before calling one done (Section 11's hard rule) —
+pull a frame from before, during, and after the animation beat.

@@ -160,5 +160,51 @@
     "title": "Men's employment",
     "subtitle": "Monthly change in men's nonfarm payrolls",
     "note": "Not a direct BLS series -- BLS publishes a 'women employees' series (CES0000000010) but no men-only counterpart, so this is total-minus-women, the same residual BLS-CPS-Jobs-Numbers/04_health_care_gender.R computes (`men = total_nonfarm - women`), expressed as a difference-of-differences so it's a monthly change like `women_change` rather than a level. Both ids are pulled in one BLS request (`ids`) so the two differences come from the same fetch vintage of CES0000000001, not a separately-fetched copy that could drift a revision out of sync with `women_change`'s own CES0000000001-derived total."
+  },
+  "labor_share": {
+    "source": "bls_xlsx",
+    "url": "https://www.bls.gov/web/prod2/labor-productivity-major-sectors.xlsx",
+    "sheet": "MachineReadable",
+    "filters": {
+      "Sector": "Nonfarm business sector",
+      "Measure": "Labor share",
+      "Units": "Percentage"
+    },
+    "frequency": "quarterly",
+    "units": "percent",
+    "decimals": 1,
+    "title": "Labor share",
+    "subtitle": "Nonfarm business sector labor share, seasonally adjusted",
+    "note": "The actual labor-share PERCENTAGE LEVEL (e.g. ~53%), not the 2017=100 index -- this is only published in the BLS Productivity and Costs news release's Excel backup table (labor-productivity-major-sectors.xlsx, MachineReadable sheet), not in the pub/time.series flat-file API, so this is the first 'bls_xlsx' source in fetch.R: downloads the xlsx fresh each run and filters to Sector/Measure/Units exactly matching command_line_AI_projects/productivity_prices_labor_share/06_labor_share_twitter.R. QUARTERLY, not monthly -- the first non-monthly series in this registry; see fetch.R's frequency-aware sanity_check and engine/scales.ts's xAxisTicks generalization. Series begins 1947 per BLS: 'the percentage of output that accrues to workers in the form of compensation... the series, which begins in 1947.' Released quarterly alongside productivity/unit-labor-cost data, roughly 5-6 weeks after quarter-end."
+  },
+  "private_change": {
+    "source": "derived",
+    "inputs": { "v": "USPRIV" },
+    "expr": "v - dplyr::lag(v, 1)",
+    "units": "count",
+    "decimals": 0,
+    "title": "Private-sector employment",
+    "subtitle": "Monthly change in private nonfarm payrolls",
+    "note": "FRED USPRIV (total private employees, SA) differenced month-over-month -- same lag-diff idea as `payrolls_change`, but pulled via `derived`/getFRED (FRED already has this level series) rather than `bls`/blsR. One of three category series added for the Jobs Day category-breakdown chart (BLS-CPS-Jobs-Numbers/14_tiktok_verticals.R's `d_private`, from the same FRED pull as `leisure_change`/`local_gov_education_change` so all three -- and `payrolls_change`'s own CES0000000001-vs-PAYEMS revision-vintage difference aside -- read as one consistent 'right now' snapshot."
+  },
+  "leisure_change": {
+    "source": "derived",
+    "inputs": { "v": "USLAH" },
+    "expr": "v - dplyr::lag(v, 1)",
+    "units": "count",
+    "decimals": 0,
+    "title": "Leisure & hospitality employment",
+    "subtitle": "Monthly change in leisure and hospitality payrolls",
+    "note": "FRED USLAH differenced month-over-month. See `private_change`'s note -- same category-breakdown chart, same FRED-not-BLS-API source choice, mirrors BLS-CPS-Jobs-Numbers/14_tiktok_verticals.R's `d_leisure`."
+  },
+  "local_gov_education_change": {
+    "source": "derived",
+    "inputs": { "v": "CES9093161101" },
+    "expr": "v - dplyr::lag(v, 1)",
+    "units": "count",
+    "decimals": 0,
+    "title": "Local government education employment",
+    "subtitle": "Monthly change in local government education payrolls",
+    "note": "FRED CES9093161101 differenced month-over-month. See `private_change`'s note -- same category-breakdown chart, mirrors BLS-CPS-Jobs-Numbers/14_tiktok_verticals.R's `d_locedu`. This is a narrower slice than total government (CES9000000001) -- local government's education workers specifically, the category that swings hardest around school-year seasonal adjustment."
   }
 }

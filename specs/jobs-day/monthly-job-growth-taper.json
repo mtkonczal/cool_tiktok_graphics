@@ -1,0 +1,18 @@
+{
+  "id": "jobs-day-job-growth-taper",
+  "type": "bar",
+  "theme": "butter_on_espresso",
+  "chrome": {
+    "title": "Monthly Job Growth",
+    "subtitle": "Thousands of jobs."
+  },
+  "series": [{ "ref": "payrolls_change", "label": "Monthly change" }],
+  "window": ["2026-01-01", "latest"],
+  "regimes": [
+    { "window": ["2026-01-01", "2026-04-01"], "color": "series", "suffix": "a month" },
+    { "window": ["2026-05-01", "latest"], "color": "accent", "suffix": "a month" }
+  ],
+  "muteDates": ["2026-02-01"],
+  "revealSeconds": 3.5,
+  "holdSeconds": 8.0
+}

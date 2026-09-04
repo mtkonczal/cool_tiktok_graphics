@@ -1,0 +1,15 @@
+{
+  "name": "local_gov_education_change",
+  "source": "derived",
+  "fetched_at": "2026-09-04T00:16:04Z",
+  "units": "count",
+  "decimals": 0,
+  "row_count": 859,
+  "first_date": "1955-01-01",
+  "last_date": "2026-07-01",
+  "last_value": -50,
+  "fred_inputs": {
+    "v": "CES9093161101"
+  },
+  "expr": "v - dplyr::lag(v, 1)"
+}
